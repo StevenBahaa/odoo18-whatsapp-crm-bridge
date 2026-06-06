@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Odoo
+*.log
+*.pot
+*.mo
+
+# Environments
+.env
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local / temporary
+*.tmp
+*.bak
+
+# Odoo filestore / sessions if accidentally copied
+filestore/
+sessions/
+
+# Secrets
+*.key
+*.pem
+
+Whatsapp crm Bridge.md
