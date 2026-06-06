@@ -31,6 +31,7 @@ MVP v1 focuses on:
         "security/ir.model.access.csv",
         "data/whatsapp_data.xml",
         "views/whatsapp_account_views.xml",
+        "views/whatsapp_webhook_event_views.xml",
     ],
     "installable": True,
     "application": False,

@@ -1,3 +1,5 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_whatsapp_account_integration_manager,access.whatsapp.account.integration.manager,model_whatsapp_account,whatsapp_crm_bridge.group_whatsapp_integration_manager,1,1,1,1
 access_whatsapp_account_crm_manager,access.whatsapp.account.crm.manager,model_whatsapp_account,whatsapp_crm_bridge.group_whatsapp_crm_manager,1,0,0,0
+access_whatsapp_webhook_event_integration_manager,access.whatsapp.webhook.event.integration.manager,model_whatsapp_webhook_event,whatsapp_crm_bridge.group_whatsapp_integration_manager,1,1,1,1
+access_whatsapp_webhook_event_crm_manager,access.whatsapp.webhook.event.crm.manager,model_whatsapp_webhook_event,whatsapp_crm_bridge.group_whatsapp_crm_manager,1,0,0,0
