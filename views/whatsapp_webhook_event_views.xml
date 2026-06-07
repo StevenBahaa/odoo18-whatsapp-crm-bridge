@@ -10,9 +10,11 @@
                 <field name="account_id"/>
                 <field name="company_id"/>
                 <field name="partner_id"/>
+                <field name="lead_id"/>
                 <field name="sender_phone"/>
                 <field name="normalized_sender_phone"/>
                 <field name="event_type"/>
+                <field name="message_type"/>
                 <field name="external_event_id"/>
                 <field name="processing_status"/>
                 <field name="processed_at"/>
@@ -44,6 +46,11 @@
                             <field name="sender_phone"/>
                             <field name="normalized_sender_phone"/>
                         </group>
+                        <group>
+                            <field name="lead_id"/>
+                            <field name="message_type"/>
+                            <field name="message_body"/>
+                        </group>
                     </group>
 
                     <notebook>
@@ -68,6 +75,8 @@
                 <field name="external_event_id"/>
                 <field name="event_type"/>
                 <field name="processing_status"/>
+                <field name="lead_id"/>
+                <field name="message_type"/>
 
                 <filter name="status_pending" string="Pending" domain="[('processing_status', '=', 'pending')]"/>
                 <filter name="status_processed" string="Processed" domain="[('processing_status', '=', 'processed')]"/>

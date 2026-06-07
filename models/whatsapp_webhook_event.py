@@ -3,6 +3,8 @@
 import json
 import logging
 
+from markupsafe import Markup, escape
+
 from odoo import api, fields, models
 
 
@@ -111,6 +113,32 @@ class WhatsAppWebhookEvent(models.Model):
     sender_name = fields.Char(
         string="Sender Name",
         help="Customer profile name extracted from WhatsApp contacts payload when available.",
+    )
+
+    lead_id = fields.Many2one(
+        comodel_name="crm.lead",
+        string="CRM Lead",
+        index=True,
+        ondelete="set null",
+        help="CRM lead matched or created from this WhatsApp webhook event.",
+    )
+
+    message_body = fields.Text(
+        string="Message Body",
+        help="Inbound WhatsApp text message body extracted from the webhook payload.",
+    )
+
+    message_type = fields.Selection(
+        selection=[
+            ("text", "Text"),
+            ("image", "Image"),
+            ("document", "Document"),
+            ("audio", "Audio"),
+            ("unknown", "Unknown"),
+        ],
+        string="Message Type",
+        default="unknown",
+        index=True,
     )
 
     @api.depends("raw_payload")
@@ -356,3 +384,180 @@ class WhatsAppWebhookEvent(models.Model):
             "normalized_phone": normalized_phone,
             "sender_name": sender_name,
         }
+
+    @api.model
+    def _extract_message_type(self, payload):
+        """
+        Extract inbound WhatsApp message type.
+
+        Expected Meta path:
+        entry[0].changes[0].value.messages[0].type
+        """
+        try:
+            value = (
+                payload.get("entry", [{}])[0]
+                .get("changes", [{}])[0]
+                .get("value", {})
+            )
+            messages = value.get("messages") or []
+            if messages:
+                return messages[0].get("type") or "unknown"
+            return "unknown"
+        except Exception:
+            _logger.exception("Failed to extract WhatsApp message type.")
+            return "unknown"
+
+
+    @api.model
+    def _extract_message_body(self, payload):
+        """
+        Extract inbound WhatsApp text body.
+
+        MVP limitation:
+        UC-05 supports text messages only for CRM chatter posting.
+        Non-text messages are logged as unsupported/unknown.
+        """
+        try:
+            value = (
+                payload.get("entry", [{}])[0]
+                .get("changes", [{}])[0]
+                .get("value", {})
+            )
+            messages = value.get("messages") or []
+            if not messages:
+                return False
+
+            message = messages[0]
+            message_type = message.get("type")
+
+            if message_type == "text":
+                return (
+                    message.get("text", {})
+                    .get("body")
+                )
+
+            return "[Unsupported WhatsApp message type: %s]" % (message_type or "unknown")
+
+        except Exception:
+            _logger.exception("Failed to extract WhatsApp message body.")
+            return False
+    
+    @api.model
+    def _find_or_create_crm_lead_from_payload(self, account, partner, payload):
+        """
+        Find or create an open CRM lead for the WhatsApp inbound message.
+
+        UC-05 rule:
+        - Do not create a new lead for every WhatsApp message.
+        - Reuse an existing open lead for the same partner and WhatsApp source.
+        - If no open lead exists, create a new lead.
+        """
+        if not partner:
+            return False
+
+        message_body = self._extract_message_body(payload)
+        sender_phone = self._extract_sender_phone(payload)
+        normalized_phone = self._normalize_phone(sender_phone)
+
+        Source = self.env["utm.source"].sudo()
+        Lead = self.env["crm.lead"].sudo()
+
+        whatsapp_source = self.env.ref(
+            "whatsapp_crm_bridge.crm_source_whatsapp",
+            raise_if_not_found=False,
+        )
+
+        domain = [
+            ("partner_id", "=", partner.id),
+            ("type", "=", "lead"),
+            ("active", "=", True),
+            ("probability", "<", 100),
+        ]
+
+        if whatsapp_source:
+            domain.append(("source_id", "=", whatsapp_source.id))
+
+        existing_lead = Lead.search(
+            domain,
+            order="create_date desc",
+            limit=1,
+        )
+
+        if existing_lead:
+            return existing_lead
+
+        lead_name = "WhatsApp Inquiry - %s" % (
+            partner.name or normalized_phone or sender_phone or "Unknown Customer"
+        )
+
+        lead_vals = {
+            "name": lead_name,
+            "type": "lead",
+            "partner_id": partner.id,
+            "contact_name": partner.name,
+            "phone": normalized_phone or sender_phone,
+            "mobile": normalized_phone or sender_phone,
+            "description": message_body or "",
+            "company_id": account.company_id.id if account and account.company_id else False,
+        }
+
+        if whatsapp_source:
+            lead_vals["source_id"] = whatsapp_source.id
+
+        return Lead.create(lead_vals)
+
+    @api.model
+    def _post_whatsapp_message_to_lead_chatter(self, lead, partner, payload):
+        """
+        Post inbound WhatsApp message into CRM lead chatter.
+
+        This gives the salesperson and manager a visible history
+        inside Odoo CRM without building a live chat UI in MVP.
+        """
+        if not lead:
+            return False
+
+        message_body = self._extract_message_body(payload)
+        message_type = self._extract_message_type(payload)
+        sender_phone = self._extract_sender_phone(payload)
+        sender_name = self._extract_sender_name(payload)
+
+        if not message_body:
+            message_body = "[Empty WhatsApp message]"
+
+        safe_sender_name = escape(sender_name or (partner.name if partner else "Unknown"))
+        safe_sender_phone = escape(sender_phone or "")
+        safe_message_type = escape(message_type or "unknown")
+        safe_message_body = escape(message_body)
+
+        chatter_body = Markup("""
+            <div>
+                <p><strong>Inbound WhatsApp Message</strong></p>
+                <table class="table table-sm">
+                    <tr>
+                        <td><strong>From</strong></td>
+                        <td>%s</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Phone</strong></td>
+                        <td>%s</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Type</strong></td>
+                        <td>%s</td>
+                    </tr>
+                </table>
+                <blockquote>%s</blockquote>
+            </div>
+        """) % (
+            safe_sender_name,
+            safe_sender_phone,
+            safe_message_type,
+            safe_message_body,
+        )
+
+        return lead.message_post(
+            body=chatter_body,
+            message_type="comment",
+            subtype_xmlid="mail.mt_note",
+        )

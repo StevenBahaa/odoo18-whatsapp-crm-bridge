@@ -231,30 +231,53 @@ class WhatsAppWebhookController(http.Controller):
             )
 
         partner_data = WebhookEvent._find_or_create_partner_from_payload(account, payload)
+        partner = partner_data["partner"]
+
+        lead = False
+        if event_type == "message" and partner:
+            lead = WebhookEvent._find_or_create_crm_lead_from_payload(
+                account,
+                partner,
+                payload,
+            )
+
+        message_type = WebhookEvent._extract_message_type(payload)
+        message_body = WebhookEvent._extract_message_body(payload)
 
         event = WebhookEvent.create({
             "account_id": account.id,
-            "partner_id": partner_data["partner"].id if partner_data["partner"] else False,
+            "partner_id": partner.id if partner else False,
+            "lead_id": lead.id if lead else False,
             "sender_phone": partner_data["sender_phone"],
             "normalized_sender_phone": partner_data["normalized_phone"],
             "sender_name": partner_data["sender_name"],
+            "message_type": message_type,
+            "message_body": message_body,
             "event_type": event_type,
             "external_event_id": external_event_id,
             "raw_payload": raw_payload,
             "processing_status": "pending",
         })
 
+        if lead:
+            WebhookEvent._post_whatsapp_message_to_lead_chatter(
+                lead,
+                partner,
+                payload,
+            )
+
         account.write({
             "last_webhook_received_at": fields.Datetime.now(),
         })
 
         _logger.info(
-            "Stored WhatsApp webhook event. account_id=%s event_id=%s event_type=%s external_event_id=%s partner_id=%s",
+            "Stored WhatsApp webhook event. account_id=%s event_id=%s event_type=%s external_event_id=%s partner_id=%s lead_id=%s",
             account.id,
             event.id,
             event_type,
             external_event_id,
             event.partner_id.id if event.partner_id else None,
+            event.lead_id.id if event.lead_id else None,
         )
 
         response_body = json.dumps({
