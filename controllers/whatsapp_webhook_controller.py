@@ -29,6 +29,12 @@ class WhatsAppWebhookController(http.Controller):
         csrf=False,
     )
     def whatsapp_webhook(self, **kwargs):
+        _logger.warning(
+            "WHATSAPP WEBHOOK HIT method=%s args=%s params=%s",
+            request.httprequest.method,
+            kwargs,
+            dict(request.params),
+        )
         try:
             db_name = self._get_db_name(**kwargs)
             if not db_name:
@@ -224,8 +230,14 @@ class WhatsAppWebhookController(http.Controller):
                 headers=[("Content-Type", "application/json")],
             )
 
-        WebhookEvent.create({
+        partner_data = WebhookEvent._find_or_create_partner_from_payload(account, payload)
+
+        event = WebhookEvent.create({
             "account_id": account.id,
+            "partner_id": partner_data["partner"].id if partner_data["partner"] else False,
+            "sender_phone": partner_data["sender_phone"],
+            "normalized_sender_phone": partner_data["normalized_phone"],
+            "sender_name": partner_data["sender_name"],
             "event_type": event_type,
             "external_event_id": external_event_id,
             "raw_payload": raw_payload,
@@ -237,10 +249,12 @@ class WhatsAppWebhookController(http.Controller):
         })
 
         _logger.info(
-            "Stored WhatsApp webhook event. account_id=%s event_type=%s external_event_id=%s",
+            "Stored WhatsApp webhook event. account_id=%s event_id=%s event_type=%s external_event_id=%s partner_id=%s",
             account.id,
+            event.id,
             event_type,
             external_event_id,
+            event.partner_id.id if event.partner_id else None,
         )
 
         response_body = json.dumps({

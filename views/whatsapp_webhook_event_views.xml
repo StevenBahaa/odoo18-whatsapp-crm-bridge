@@ -9,6 +9,9 @@
                 <field name="create_date"/>
                 <field name="account_id"/>
                 <field name="company_id"/>
+                <field name="partner_id"/>
+                <field name="sender_phone"/>
+                <field name="normalized_sender_phone"/>
                 <field name="event_type"/>
                 <field name="external_event_id"/>
                 <field name="processing_status"/>
@@ -35,6 +38,11 @@
                             <field name="create_date"/>
                             <field name="processed_at"/>
                             <field name="error_message"/>
+                        </group>
+                        <group>
+                            <field name="partner_id"/>
+                            <field name="sender_phone"/>
+                            <field name="normalized_sender_phone"/>
                         </group>
                     </group>
 

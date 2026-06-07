@@ -88,6 +88,31 @@ class WhatsAppWebhookEvent(models.Model):
         store=False,
     )
 
+    partner_id = fields.Many2one(
+        comodel_name="res.partner",
+        string="Matched Partner",
+        index=True,
+        ondelete="set null",
+        help="Customer partner matched or created from the WhatsApp sender phone.",
+    )
+
+    sender_phone = fields.Char(
+        string="Sender Phone",
+        index=True,
+        help="Original WhatsApp sender phone extracted from the webhook payload.",
+    )
+
+    normalized_sender_phone = fields.Char(
+        string="Normalized Sender Phone",
+        index=True,
+        help="Normalized sender phone used for partner matching.",
+    )
+
+    sender_name = fields.Char(
+        string="Sender Name",
+        help="Customer profile name extracted from WhatsApp contacts payload when available.",
+    )
+
     @api.depends("raw_payload")
     def _compute_payload_preview(self):
         for event in self:
@@ -190,3 +215,144 @@ class WhatsAppWebhookEvent(models.Model):
         except Exception:
             _logger.exception("Failed to extract external event ID from WhatsApp webhook payload.")
             return False
+    
+    @api.model
+    def _normalize_phone(self, phone, country_code="20"):
+        """
+        Normalize phone numbers for Egypt-focused MVP.
+
+        Examples:
+        - 01012345678     -> 201012345678
+        - +201012345678   -> 201012345678
+        - 00201012345678  -> 201012345678
+        - 201012345678    -> 201012345678
+
+        MVP limitation:
+        This is Egypt-focused. Later it can become configurable per account/company.
+        """
+        if not phone:
+            return False
+
+        digits = "".join(ch for ch in str(phone).strip() if ch.isdigit())
+
+        if not digits:
+            return False
+
+        if digits.startswith("00"):
+            digits = digits[2:]
+
+        if digits.startswith("0"):
+            digits = country_code + digits[1:]
+
+        return digits
+
+
+    @api.model
+    def _extract_sender_phone(self, payload):
+        """
+        Extract sender phone from inbound WhatsApp message payload.
+
+        Expected Meta path:
+        entry[0].changes[0].value.messages[0].from
+        """
+        try:
+            value = (
+                payload.get("entry", [{}])[0]
+                .get("changes", [{}])[0]
+                .get("value", {})
+            )
+            messages = value.get("messages") or []
+            if messages:
+                return messages[0].get("from")
+            return False
+        except Exception:
+            _logger.exception("Failed to extract sender phone from WhatsApp webhook payload.")
+            return False
+
+
+    @api.model
+    def _extract_sender_name(self, payload):
+        """
+        Extract WhatsApp profile name when available.
+
+        Expected Meta path:
+        entry[0].changes[0].value.contacts[0].profile.name
+        """
+        try:
+            value = (
+                payload.get("entry", [{}])[0]
+                .get("changes", [{}])[0]
+                .get("value", {})
+            )
+            contacts = value.get("contacts") or []
+            if contacts:
+                return (
+                    contacts[0]
+                    .get("profile", {})
+                    .get("name")
+                )
+            return False
+        except Exception:
+            _logger.exception("Failed to extract sender name from WhatsApp webhook payload.")
+            return False
+
+    @api.model
+    def _find_or_create_partner_from_payload(self, account, payload):
+        """
+        Find or create res.partner using WhatsApp sender phone.
+
+        UC-04 only handles partner matching/creation.
+        CRM lead creation is intentionally left for UC-05.
+        """
+        sender_phone = self._extract_sender_phone(payload)
+        normalized_phone = self._normalize_phone(sender_phone)
+        sender_name = self._extract_sender_name(payload)
+
+        if not normalized_phone:
+            return {
+                "partner": False,
+                "sender_phone": sender_phone,
+                "normalized_phone": False,
+                "sender_name": sender_name,
+            }
+
+        Partner = self.env["res.partner"].sudo()
+
+        partner = Partner.search(
+            [
+                "|",
+                ("phone", "=", normalized_phone),
+                ("mobile", "=", normalized_phone),
+            ],
+            limit=1,
+        )
+
+        if not partner:
+            # Extra fallback: check common display formats lightly.
+            partner = Partner.search(
+                [
+                    "|",
+                    ("phone", "ilike", normalized_phone[-10:]),
+                    ("mobile", "ilike", normalized_phone[-10:]),
+                ],
+                limit=1,
+            )
+
+        if not partner:
+            partner_name = sender_name or "WhatsApp Customer %s" % normalized_phone
+
+            partner_vals = {
+                "name": partner_name,
+                "mobile": normalized_phone,
+                "phone": normalized_phone,
+                "company_id": account.company_id.id if account and account.company_id else False,
+            }
+
+            partner = Partner.create(partner_vals)
+
+        return {
+            "partner": partner,
+            "sender_phone": sender_phone,
+            "normalized_phone": normalized_phone,
+            "sender_name": sender_name,
+        }
