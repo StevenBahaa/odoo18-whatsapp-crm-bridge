@@ -4,6 +4,8 @@ import logging
 
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError
+import json
+import requests
 
 
 _logger = logging.getLogger(__name__)
@@ -175,4 +177,117 @@ class WhatsAppAccount(models.Model):
                 "type": "info",
                 "sticky": False,
             },
+        }
+    
+    def _send_text_message(self, to_phone, body):
+        """
+        Send a WhatsApp text message through Meta Cloud API.
+
+        UC-06 supports manual text replies only.
+        No templates, media, campaigns, chatbot, or media logic.
+
+        Important Odoo behavior:
+        Do not raise UserError after writing failure status, because raising
+        rolls back the current transaction and the account error state may not persist.
+        Instead, return a structured result and let the wizard display the error.
+        """
+        self.ensure_one()
+
+        if not self.access_token:
+            raise UserError(_("Missing WhatsApp access token."))
+
+        if not self.phone_number_id:
+            raise UserError(_("Missing WhatsApp phone number ID."))
+
+        if not to_phone:
+            raise UserError(_("Missing recipient phone number."))
+
+        if not body:
+            raise UserError(_("Message body cannot be empty."))
+
+        api_version = self.api_version or "v20.0"
+
+        url = "https://graph.facebook.com/%s/%s/messages" % (
+            api_version,
+            self.phone_number_id,
+        )
+
+        headers = {
+            "Authorization": "Bearer %s" % self.access_token,
+            "Content-Type": "application/json",
+        }
+
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": to_phone,
+            "type": "text",
+            "text": {
+                "body": body,
+            },
+        }
+
+        try:
+            response = requests.post(
+                url,
+                headers=headers,
+                data=json.dumps(payload),
+                timeout=30,
+            )
+        except requests.RequestException as error:
+            error_message = str(error)
+
+            self.write({
+                "connection_state": "failed",
+                "connection_error_message": error_message,
+                "last_connection_test_at": fields.Datetime.now(),
+            })
+
+            return {
+                "success": False,
+                "error_message": error_message,
+                "response_json": {},
+                "response_text": error_message,
+                "status_code": False,
+            }
+
+        response_text = response.text
+
+        try:
+            response_json = response.json()
+        except ValueError:
+            response_json = {}
+
+        if response.status_code not in (200, 201):
+            error_message = (
+                response_json.get("error", {}).get("message")
+                or response_text
+                or _("Unknown Meta WhatsApp API error.")
+            )
+
+            self.write({
+                "connection_state": "failed",
+                "connection_error_message": error_message,
+                "last_connection_test_at": fields.Datetime.now(),
+            })
+
+            return {
+                "success": False,
+                "error_message": error_message,
+                "response_json": response_json,
+                "response_text": response_text,
+                "status_code": response.status_code,
+            }
+
+        self.write({
+            "connection_state": "success",
+            "connection_error_message": False,
+            "last_connection_test_at": fields.Datetime.now(),
+        })
+
+        return {
+            "success": True,
+            "error_message": False,
+            "response_json": response_json,
+            "response_text": response_text,
+            "status_code": response.status_code,
         }

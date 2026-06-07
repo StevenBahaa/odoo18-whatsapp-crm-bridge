@@ -32,6 +32,8 @@ MVP v1 focuses on:
         "data/whatsapp_data.xml",
         "views/whatsapp_account_views.xml",
         "views/whatsapp_webhook_event_views.xml",
+        "views/whatsapp_send_message_wizard_views.xml",
+        "views/crm_lead_views.xml",
     ],
     "installable": True,
     "application": False,
