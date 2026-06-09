@@ -19,6 +19,9 @@ class WhatsAppWebhookController(http.Controller):
 
     UC-03:
     - POST webhook payload logging.
+
+    UC-07:
+    - Status webhook processing for sent/delivered/read/failed updates.
     """
 
     @http.route(
@@ -52,7 +55,9 @@ class WhatsAppWebhookController(http.Controller):
 
                 if request.httprequest.method == "POST":
                     response = self._receive_webhook(env, **kwargs)
-                    # Commit the cursor only after successful POST handling where records are written.
+                    # External webhook requests do not use the normal browser
+                    # transaction flow. Commit only after a controlled 200 response
+                    # where records were safely written.
                     if response.status_code == 200:
                         try:
                             resp_data = json.loads(response.data.decode("utf-8"))
@@ -69,7 +74,7 @@ class WhatsAppWebhookController(http.Controller):
                     "Method Not Allowed",
                     status=405,
                 )
-        except Exception as e:
+        except Exception:
             _logger.exception("Error processing WhatsApp webhook:")
             # Do not expose internal tracebacks or sensitive information in HTTP responses.
             return request.make_response(
@@ -102,6 +107,13 @@ class WhatsAppWebhookController(http.Controller):
             return False
 
         return db_name
+
+    def _json_response(self, data, status=200):
+        return request.make_response(
+            json.dumps(data),
+            status=status,
+            headers=[("Content-Type", "application/json")],
+        )
 
     def _verify_webhook(self, env, **kwargs):
         """
@@ -151,40 +163,34 @@ class WhatsAppWebhookController(http.Controller):
 
     def _receive_webhook(self, env, **kwargs):
         """
-        Receive Meta WhatsApp webhook POST payload and store it.
+        Receive Meta WhatsApp webhook POST payload.
 
-        UC-03 only logs the event. Message parsing, partner matching,
-        and CRM lead creation will be implemented in later UCs.
+        This method keeps raw webhook logging as the audit layer, then delegates
+        business processing based on the detected event type:
+        - message: partner/lead/chatter flow + inbound whatsapp.message record.
+        - status: update existing whatsapp.message by external_message_id.
+        - unknown: log safely as ignored.
         """
         WebhookEvent = env["whatsapp.webhook.event"].sudo()
         Account = env["whatsapp.account"].sudo()
+        WhatsAppMessage = env["whatsapp.message"].sudo()
 
         try:
             raw_body = request.httprequest.get_data(as_text=True)
             payload = json.loads(raw_body) if raw_body else {}
         except Exception:
             _logger.exception("Invalid JSON received from WhatsApp webhook.")
-            response_body = json.dumps({
+            return self._json_response({
                 "status": "failed",
                 "reason": "invalid_json",
-            })
-            return request.make_response(
-                response_body,
-                status=400,
-                headers=[("Content-Type", "application/json")],
-            )
+            }, status=400)
 
         if not payload:
             _logger.warning("Received empty WhatsApp webhook payload.")
-            response_body = json.dumps({
+            return self._json_response({
                 "status": "ignored",
                 "reason": "empty_payload",
             })
-            return request.make_response(
-                response_body,
-                status=200,
-                headers=[("Content-Type", "application/json")],
-            )
 
         raw_payload = WebhookEvent._json_dumps_payload(payload)
         phone_number_id = WebhookEvent._extract_phone_number_id(payload)
@@ -220,21 +226,134 @@ class WhatsAppWebhookController(http.Controller):
                 phone_number_id,
             )
 
-            response_body = json.dumps({
+            return self._json_response({
                 "status": "ignored",
                 "reason": "account_not_found",
             })
-            return request.make_response(
-                response_body,
-                status=200,
-                headers=[("Content-Type", "application/json")],
+
+        if event_type == "status":
+            return self._process_status_webhook(
+                WebhookEvent,
+                WhatsAppMessage,
+                account,
+                payload,
+                raw_payload,
+                external_event_id,
             )
 
+        if event_type == "message":
+            return self._process_message_webhook(
+                WebhookEvent,
+                WhatsAppMessage,
+                account,
+                payload,
+                raw_payload,
+                external_event_id,
+            )
+
+        event = WebhookEvent.create({
+            "account_id": account.id,
+            "event_type": event_type,
+            "external_event_id": external_event_id,
+            "raw_payload": raw_payload,
+            "processing_status": "ignored",
+            "error_message": "Unsupported or unknown WhatsApp webhook event type.",
+            "processed_at": fields.Datetime.now(),
+        })
+
+        account.write({
+            "last_webhook_received_at": fields.Datetime.now(),
+        })
+
+        _logger.info(
+            "Ignored unknown WhatsApp webhook event. account_id=%s event_id=%s external_event_id=%s",
+            account.id,
+            event.id,
+            external_event_id,
+        )
+
+        return self._json_response({
+            "status": "ignored",
+            "reason": "unknown_event_type",
+        })
+
+    def _process_status_webhook(self, WebhookEvent, WhatsAppMessage, account, payload, raw_payload, external_event_id):
+        """
+        Process Meta message status webhook.
+
+        Status webhooks do not represent a new customer message. Therefore we do
+        not create partners/leads here. We only update an existing whatsapp.message.
+        """
+        event = WebhookEvent.create({
+            "account_id": account.id,
+            "event_type": "status",
+            "external_event_id": external_event_id,
+            "raw_payload": raw_payload,
+            "processing_status": "pending",
+        })
+
+        result = WhatsAppMessage._apply_status_webhook(account, payload)
+        matched_message = result.get("message")
+
+        if result.get("success"):
+            event.write({
+                "partner_id": matched_message.partner_id.id if matched_message and matched_message.partner_id else False,
+                "lead_id": matched_message.lead_id.id if matched_message and matched_message.lead_id else False,
+                "processing_status": "processed",
+                "error_message": False,
+                "processed_at": fields.Datetime.now(),
+            })
+
+            _logger.info(
+                "Processed WhatsApp status webhook. account_id=%s event_id=%s external_message_id=%s message_id=%s",
+                account.id,
+                event.id,
+                result.get("external_message_id"),
+                matched_message.id if matched_message else None,
+            )
+        else:
+            reason = result.get("reason") or "unknown_status_processing_error"
+            external_message_id = result.get("external_message_id") or external_event_id or "N/A"
+            event.write({
+                "partner_id": matched_message.partner_id.id if matched_message and matched_message.partner_id else False,
+                "lead_id": matched_message.lead_id.id if matched_message and matched_message.lead_id else False,
+                "processing_status": "ignored",
+                "error_message": "Status webhook ignored: %s. External message ID: %s" % (
+                    reason,
+                    external_message_id,
+                ),
+                "processed_at": fields.Datetime.now(),
+            })
+
+            _logger.warning(
+                "Ignored WhatsApp status webhook. account_id=%s event_id=%s reason=%s external_message_id=%s",
+                account.id,
+                event.id,
+                reason,
+                external_message_id,
+            )
+
+        account.write({
+            "last_webhook_received_at": fields.Datetime.now(),
+        })
+
+        return self._json_response({
+            "status": "received",
+            "event_type": "status",
+        })
+
+    def _process_message_webhook(self, WebhookEvent, WhatsAppMessage, account, payload, raw_payload, external_event_id):
+        """
+        Process inbound WhatsApp message webhook.
+
+        This preserves the existing UC-04/UC-05 behavior and adds the new
+        durable whatsapp.message record required by UC-07.
+        """
         partner_data = WebhookEvent._find_or_create_partner_from_payload(account, payload)
         partner = partner_data["partner"]
 
         lead = False
-        if event_type == "message" and partner:
+        if partner:
             lead = WebhookEvent._find_or_create_crm_lead_from_payload(
                 account,
                 partner,
@@ -253,11 +372,18 @@ class WhatsAppWebhookController(http.Controller):
             "sender_name": partner_data["sender_name"],
             "message_type": message_type,
             "message_body": message_body,
-            "event_type": event_type,
+            "event_type": "message",
             "external_event_id": external_event_id,
             "raw_payload": raw_payload,
             "processing_status": "pending",
         })
+
+        whatsapp_message = WhatsAppMessage.create_inbound_from_payload(
+            account,
+            partner,
+            lead,
+            payload,
+        )
 
         if lead:
             WebhookEvent._post_whatsapp_message_to_lead_chatter(
@@ -266,25 +392,26 @@ class WhatsAppWebhookController(http.Controller):
                 payload,
             )
 
+        event.write({
+            "processing_status": "processed",
+            "processed_at": fields.Datetime.now(),
+        })
+
         account.write({
             "last_webhook_received_at": fields.Datetime.now(),
         })
 
         _logger.info(
-            "Stored WhatsApp webhook event. account_id=%s event_id=%s event_type=%s external_event_id=%s partner_id=%s lead_id=%s",
+            "Processed WhatsApp message webhook. account_id=%s event_id=%s whatsapp_message_id=%s external_event_id=%s partner_id=%s lead_id=%s",
             account.id,
             event.id,
-            event_type,
+            whatsapp_message.id if whatsapp_message else None,
             external_event_id,
             event.partner_id.id if event.partner_id else None,
             event.lead_id.id if event.lead_id else None,
         )
 
-        response_body = json.dumps({
+        return self._json_response({
             "status": "received",
+            "event_type": "message",
         })
-        return request.make_response(
-            response_body,
-            status=200,
-            headers=[("Content-Type", "application/json")],
-        )

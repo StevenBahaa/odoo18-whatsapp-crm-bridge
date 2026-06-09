@@ -107,6 +107,18 @@ class WhatsAppSendMessageWizard(models.TransientModel):
             self.message_body,
         )
 
+        # UC-07: every outbound send attempt must have a durable message record.
+        # This includes failures, because failures are operationally important and
+        # must not disappear after the wizard closes.
+        whatsapp_message = self.env["whatsapp.message"].sudo().create_outbound_from_send_result(
+            account=self.account_id,
+            lead=self.lead_id,
+            partner=self.partner_id,
+            recipient_phone=normalized_phone,
+            body=self.message_body,
+            send_result=send_result,
+        )
+
         response_json = send_result.get("response_json") or {}
         external_message_id = False
 

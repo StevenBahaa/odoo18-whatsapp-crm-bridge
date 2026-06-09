@@ -31,6 +31,7 @@ MVP v1 focuses on:
         "security/ir.model.access.csv",
         "data/whatsapp_data.xml",
         "views/whatsapp_account_views.xml",
+        "views/whatsapp_message_views.xml",
         "views/whatsapp_webhook_event_views.xml",
         "views/whatsapp_send_message_wizard_views.xml",
         "views/crm_lead_views.xml",

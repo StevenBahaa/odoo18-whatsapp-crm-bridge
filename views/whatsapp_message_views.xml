@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_whatsapp_message_list" model="ir.ui.view">
+        <field name="name">whatsapp.message.list</field>
+        <field name="model">whatsapp.message</field>
+        <field name="arch" type="xml">
+            <list string="WhatsApp Messages" create="0" edit="0">
+                <field name="create_date"/>
+                <field name="account_id"/>
+                <field name="company_id"/>
+                <field name="direction"/>
+                <field name="partner_id"/>
+                <field name="lead_id"/>
+                <field name="message_type"/>
+                <field name="status"/>
+                <field name="recipient_phone"/>
+                <field name="external_sender_id"/>
+                <field name="external_message_id"/>
+                <field name="sent_at"/>
+                <field name="delivered_at"/>
+                <field name="read_at"/>
+                <field name="failed_at"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_whatsapp_message_form" model="ir.ui.view">
+        <field name="name">whatsapp.message.form</field>
+        <field name="model">whatsapp.message</field>
+        <field name="arch" type="xml">
+            <form string="WhatsApp Message" create="0" edit="0">
+                <sheet>
+                    <group>
+                        <group string="Message">
+                            <field name="account_id"/>
+                            <field name="company_id"/>
+                            <field name="direction"/>
+                            <field name="message_type"/>
+                            <field name="status"/>
+                            <field name="external_message_id"/>
+                        </group>
+                        <group string="Related Records">
+                            <field name="partner_id"/>
+                            <field name="lead_id"/>
+                            <field name="recipient_phone"/>
+                            <field name="external_sender_id"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <page string="Body">
+                            <field name="body" readonly="1" nolabel="1"/>
+                        </page>
+                        <page string="Status Timeline">
+                            <group>
+                                <group>
+                                    <field name="received_at"/>
+                                    <field name="sent_at"/>
+                                </group>
+                                <group>
+                                    <field name="delivered_at"/>
+                                    <field name="read_at"/>
+                                    <field name="failed_at"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Error">
+                            <group>
+                                <field name="error_code"/>
+                                <field name="error_message"/>
+                            </group>
+                        </page>
+                        <page string="Payload Preview">
+                            <field name="payload_preview" readonly="1" nolabel="1"/>
+                        </page>
+                        <page string="Raw Payload">
+                            <field name="raw_payload" readonly="1" nolabel="1"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_whatsapp_message_search" model="ir.ui.view">
+        <field name="name">whatsapp.message.search</field>
+        <field name="model">whatsapp.message</field>
+        <field name="arch" type="xml">
+            <search string="Search WhatsApp Messages">
+                <field name="account_id"/>
+                <field name="partner_id"/>
+                <field name="lead_id"/>
+                <field name="external_message_id"/>
+                <field name="recipient_phone"/>
+                <field name="external_sender_id"/>
+                <field name="direction"/>
+                <field name="status"/>
+
+                <filter name="direction_inbound" string="Inbound" domain="[('direction', '=', 'inbound')]"/>
+                <filter name="direction_outbound" string="Outbound" domain="[('direction', '=', 'outbound')]"/>
+
+                <separator/>
+
+                <filter name="status_received" string="Received" domain="[('status', '=', 'received')]"/>
+                <filter name="status_sent" string="Sent" domain="[('status', '=', 'sent')]"/>
+                <filter name="status_delivered" string="Delivered" domain="[('status', '=', 'delivered')]"/>
+                <filter name="status_read" string="Read" domain="[('status', '=', 'read')]"/>
+                <filter name="status_failed" string="Failed" domain="[('status', '=', 'failed')]"/>
+
+                <group expand="0" string="Group By">
+                    <filter name="group_by_account" string="Account" context="{'group_by': 'account_id'}"/>
+                    <filter name="group_by_company" string="Company" context="{'group_by': 'company_id'}"/>
+                    <filter name="group_by_direction" string="Direction" context="{'group_by': 'direction'}"/>
+                    <filter name="group_by_status" string="Status" context="{'group_by': 'status'}"/>
+                    <filter name="group_by_lead" string="Lead" context="{'group_by': 'lead_id'}"/>
+                    <filter name="group_by_partner" string="Customer" context="{'group_by': 'partner_id'}"/>
+                    <filter name="group_by_create_date" string="Creation Date" context="{'group_by': 'create_date'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_whatsapp_message" model="ir.actions.act_window">
+        <field name="name">WhatsApp Messages</field>
+        <field name="res_model">whatsapp.message</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_whatsapp_message_search"/>
+        <field name="context">{'search_default_group_by_create_date': 1}</field>
+    </record>
+
+    <menuitem
+        id="menu_whatsapp_message"
+        name="Messages"
+        parent="menu_whatsapp_crm_configuration"
+        action="action_whatsapp_message"
+        sequence="15"
+        groups="whatsapp_crm_bridge.group_whatsapp_crm_user,whatsapp_crm_bridge.group_whatsapp_crm_manager,whatsapp_crm_bridge.group_whatsapp_integration_manager"
+    />
+
+</odoo>
