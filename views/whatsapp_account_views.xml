@@ -5,16 +5,17 @@
         <field name="name">whatsapp.account.tree</field>
         <field name="model">whatsapp.account</field>
         <field name="arch" type="xml">
-            <list string="WhatsApp Accounts">
+            <list string="WhatsApp Accounts" decoration-success="connection_state == 'success'" decoration-danger="connection_state == 'failed'" decoration-warning="connection_state == 'not_tested'">
                 <field name="name"/>
-                <field name="company_id"/>
-                <field name="mode"/>
-                <field name="api_version"/>
-                <field name="phone_number_id"/>
+                <field name="company_id" optional="show"/>
+                <field name="mode" widget="badge" decoration-info="mode == 'sandbox'" decoration-success="mode == 'production'"/>
                 <field name="business_phone_number"/>
-                <field name="connection_state"/>
-                <field name="last_connection_test_at"/>
-                <field name="active"/>
+                <field name="phone_number_id" optional="hide"/>
+                <field name="waba_id" optional="hide"/>
+                <field name="api_version" optional="hide"/>
+                <field name="connection_state" widget="badge" decoration-success="connection_state == 'success'" decoration-danger="connection_state == 'failed'" decoration-warning="connection_state == 'not_tested'"/>
+                <field name="last_connection_test_at" optional="show"/>
+                <field name="active" widget="boolean_toggle"/>
             </list>
         </field>
     </record>
@@ -37,53 +38,57 @@
 
                 <sheet>
                     <div class="oe_title">
-                        <label for="name"/>
+                        <label for="name" class="oe_edit_only"/>
                         <h1>
                             <field name="name" placeholder="Example: Main WhatsApp Account"/>
                         </h1>
                     </div>
 
                     <group>
-                        <group string="General">
+                        <group string="Configuration Profile">
                             <field name="company_id"/>
-                            <field name="active"/>
-                            <field name="mode"/>
+                            <field name="mode" widget="radio" options="{'horizontal': true}"/>
                             <field name="api_version"/>
+                            <field name="active" widget="boolean_toggle"/>
                         </group>
 
-                        <group string="Meta Account">
+                        <group string="Meta API Metadata">
                             <field name="phone_number_id"/>
                             <field name="waba_id"/>
-                            <field name="business_phone_number"/>
-                        </group>
-                    </group>
-
-                    <group string="Credentials" groups="whatsapp_crm_bridge.group_whatsapp_integration_manager">
-                        <group>
-                            <field name="access_token" password="True"/>
-                            <field name="webhook_verify_token" password="True"/>
-                            <field name="webhook_secret" password="True"/>
-                            <field name="token_expiry_date"/>
-                        </group>
-                    </group>
-
-                    <group string="Technical Status">
-                        <group>
-                            <field name="last_webhook_received_at" readonly="1"/>
-                            <field name="last_connection_test_at" readonly="1"/>
-                        </group>
-                        <group>
-                            <field name="connection_error_message" readonly="1"/>
+                            <field name="business_phone_number" placeholder="+201012345678"/>
                         </group>
                     </group>
 
                     <notebook>
+                        <page string="API Credentials" groups="whatsapp_crm_bridge.group_whatsapp_integration_manager">
+                            <group>
+                                <group string="Meta Cloud API Secrets">
+                                    <field name="access_token" password="True" placeholder="Enter System User Access Token"/>
+                                    <field name="webhook_verify_token" password="True" placeholder="Define a token for Webhook Verification"/>
+                                    <field name="webhook_secret" password="True" placeholder="Enter WABA Webhook App Secret (Optional)"/>
+                                </group>
+                                <group string="Token Lifecycle">
+                                    <field name="token_expiry_date"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Webhook &amp; Test Status">
+                            <group>
+                                <group string="Activity Timestamps">
+                                    <field name="last_webhook_received_at" readonly="1"/>
+                                    <field name="last_connection_test_at" readonly="1"/>
+                                </group>
+                                <group string="Error Audit">
+                                    <field name="connection_error_message" readonly="1" invisible="not connection_error_message"/>
+                                </group>
+                            </group>
+                        </page>
                         <page string="Implementation Notes">
-                            <p>
+                            <p class="text-muted">
                                 Access token masking in this form hides the token from normal UI display,
                                 but it does not encrypt the value in the database.
                             </p>
-                            <p>
+                            <p class="text-muted">
                                 For production, use encrypted storage or load the real token from a
                                 deployment-level secret manager or environment variable.
                             </p>
@@ -105,6 +110,9 @@
                 <filter name="active" string="Active" domain="[('active', '=', True)]"/>
                 <filter name="sandbox" string="Sandbox" domain="[('mode', '=', 'sandbox')]"/>
                 <filter name="production" string="Production" domain="[('mode', '=', 'production')]"/>
+                <separator/>
+                <filter name="state_success" string="Connection Success" domain="[('connection_state', '=', 'success')]"/>
+                <filter name="state_failed" string="Connection Failed" domain="[('connection_state', '=', 'failed')]"/>
                 <group expand="0" string="Group By">
                     <filter name="group_by_company" string="Company" context="{'group_by': 'company_id'}"/>
                     <filter name="group_by_mode" string="Mode" context="{'group_by': 'mode'}"/>
@@ -122,10 +130,27 @@
         <field name="context">{'search_default_active': 1}</field>
     </record>
 
+    <!-- Menu Structure -->
     <menuitem
         id="menu_whatsapp_crm_root"
         name="WhatsApp CRM"
         sequence="60"
+        groups="whatsapp_crm_bridge.group_whatsapp_crm_user"
+    />
+
+    <menuitem
+        id="menu_whatsapp_crm_operations"
+        name="Operations"
+        parent="menu_whatsapp_crm_root"
+        sequence="10"
+        groups="whatsapp_crm_bridge.group_whatsapp_crm_user"
+    />
+
+    <menuitem
+        id="menu_whatsapp_crm_reporting"
+        name="Reporting"
+        parent="menu_whatsapp_crm_root"
+        sequence="20"
         groups="whatsapp_crm_bridge.group_whatsapp_crm_manager"
     />
 
