@@ -1,4 +1,5 @@
 from odoo import api, fields, models, _
+from odoo.exceptions import UserError
 
 
 class WhatsAppConversation(models.Model):
@@ -262,3 +263,95 @@ class WhatsAppConversation(models.Model):
 
     def action_mark_closed(self):
         self.write({"state": "closed"})
+
+    def action_open_crm_lead(self):
+        self.ensure_one()
+
+        if not self.lead_id:
+            raise UserError(_("This WhatsApp conversation is not linked to a CRM lead."))
+
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("CRM Lead"),
+            "res_model": "crm.lead",
+            "view_mode": "form",
+            "res_id": self.lead_id.id,
+            "target": "current",
+        }
+
+    def action_send_whatsapp_message(self):
+        self.ensure_one()
+
+        if not self.lead_id:
+            raise UserError(_("This WhatsApp conversation must be linked to a CRM lead before sending a reply."))
+
+        phone = self.normalized_phone or self.phone
+
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Send WhatsApp Message"),
+            "res_model": "whatsapp.send.message.wizard",
+            "view_mode": "form",
+            "target": "new",
+            "context": {
+                "active_model": "whatsapp.conversation",
+                "active_id": self.id,
+                "default_conversation_id": self.id,
+                "default_lead_id": self.lead_id.id,
+                "default_partner_id": self.partner_id.id if self.partner_id else False,
+                "default_account_id": self.account_id.id if self.account_id else False,
+                "default_phone": phone,
+            },
+        }
+
+
+class CrmLead(models.Model):
+    _inherit = "crm.lead"
+
+    whatsapp_conversation_count = fields.Integer(
+        string="WhatsApp Conversations",
+        compute="_compute_whatsapp_conversation_count",
+    )
+
+    def _compute_whatsapp_conversation_count(self):
+        grouped_data = self.env["whatsapp.conversation"].read_group(
+            [("lead_id", "in", self.ids)],
+            ["lead_id"],
+            ["lead_id"],
+        )
+        counts_by_lead = {
+            data["lead_id"][0]: data.get("lead_id_count", data.get("__count", 0))
+            for data in grouped_data
+            if data.get("lead_id")
+        }
+
+        for lead in self:
+            lead.whatsapp_conversation_count = counts_by_lead.get(lead.id, 0)
+
+    def action_open_whatsapp_conversations(self):
+        self.ensure_one()
+
+        action = {
+            "type": "ir.actions.act_window",
+            "name": _("WhatsApp Conversations"),
+            "res_model": "whatsapp.conversation",
+            "view_mode": "list,form",
+            "domain": [("lead_id", "=", self.id)],
+            "context": {
+                "default_lead_id": self.id,
+                "default_partner_id": self.partner_id.id if self.partner_id else False,
+            },
+        }
+
+        conversations = self.env["whatsapp.conversation"].search(
+            [("lead_id", "=", self.id)],
+            order="last_message_at desc, create_date desc",
+        )
+
+        if len(conversations) == 1:
+            action.update({
+                "view_mode": "form",
+                "res_id": conversations.id,
+            })
+
+        return action

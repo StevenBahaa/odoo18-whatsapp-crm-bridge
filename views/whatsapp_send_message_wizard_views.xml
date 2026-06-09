@@ -9,6 +9,7 @@
                 <group>
                     <field name="lead_id"/>
                     <field name="partner_id"/>
+                    <field name="conversation_id" invisible="not conversation_id"/>
                     <field name="account_id"/>
                     <field name="phone"/>
                     <field name="message_body" placeholder="Write your WhatsApp reply here..."/>
