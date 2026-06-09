@@ -140,6 +140,13 @@ class WhatsAppWebhookEvent(models.Model):
         default="unknown",
         index=True,
     )
+    assigned_user_id = fields.Many2one(
+        comodel_name="res.users",
+        string="Assigned Salesperson",
+        index=True,
+        ondelete="set null",
+        help="Salesperson responsible for the CRM lead linked to this webhook event.",
+    )
 
     @api.depends("raw_payload")
     def _compute_payload_preview(self):

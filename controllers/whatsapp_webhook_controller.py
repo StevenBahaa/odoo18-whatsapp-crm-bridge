@@ -299,6 +299,7 @@ class WhatsAppWebhookController(http.Controller):
             event.write({
                 "partner_id": matched_message.partner_id.id if matched_message and matched_message.partner_id else False,
                 "lead_id": matched_message.lead_id.id if matched_message and matched_message.lead_id else False,
+                "assigned_user_id": matched_message.assigned_user_id.id if matched_message and matched_message.assigned_user_id else False,
                 "processing_status": "processed",
                 "error_message": False,
                 "processed_at": fields.Datetime.now(),
@@ -376,6 +377,7 @@ class WhatsAppWebhookController(http.Controller):
             "external_event_id": external_event_id,
             "raw_payload": raw_payload,
             "processing_status": "pending",
+            "assigned_user_id": lead.user_id.id if lead and lead.user_id else False,
         })
 
         whatsapp_message = WhatsAppMessage.create_inbound_from_payload(

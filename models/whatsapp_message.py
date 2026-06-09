@@ -161,6 +161,14 @@ class WhatsAppMessage(models.Model):
         copy=False,
     )
 
+    assigned_user_id = fields.Many2one(
+        comodel_name="res.users",
+        string="Assigned Salesperson",
+        index=True,
+        ondelete="set null",
+        help="Salesperson responsible for this WhatsApp message, usually taken from the linked CRM lead.",
+    )
+
     _sql_constraints = [
         (
             "external_message_account_unique",
@@ -369,6 +377,7 @@ class WhatsAppMessage(models.Model):
             "account_id": account.id,
             "partner_id": partner.id if partner else False,
             "lead_id": lead.id if lead else False,
+            "assigned_user_id": lead.user_id.id if lead and lead.user_id else False,
             "direction": "outbound",
             "message_type": "text",
             "body": body,
@@ -416,6 +425,7 @@ class WhatsAppMessage(models.Model):
             "account_id": account.id,
             "partner_id": partner.id if partner else False,
             "lead_id": lead.id if lead else False,
+            "assigned_user_id": lead.user_id.id if lead and lead.user_id else False,
             "direction": "inbound",
             "message_type": message_type if message_type in dict(self._fields["message_type"].selection) else "unknown",
             "body": message_body,
