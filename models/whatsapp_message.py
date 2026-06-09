@@ -168,6 +168,13 @@ class WhatsAppMessage(models.Model):
         ondelete="set null",
         help="Salesperson responsible for this WhatsApp message, usually taken from the linked CRM lead.",
     )
+    conversation_id = fields.Many2one(
+        comodel_name="whatsapp.conversation",
+        string="WhatsApp Conversation",
+        index=True,
+        ondelete="set null",
+        help="Conversation that groups this WhatsApp message with related inbound/outbound messages.",
+    )
 
     _sql_constraints = [
         (
@@ -373,10 +380,22 @@ class WhatsAppMessage(models.Model):
         now = fields.Datetime.now()
         success = bool(send_result.get("success"))
 
+        Conversation = self.env["whatsapp.conversation"].sudo()
+
+        conversation = Conversation.find_or_create_open_conversation(
+            account=account,
+            normalized_phone=recipient_phone,
+            partner=partner,
+            lead=lead,
+            assigned_user=lead.user_id if lead and lead.user_id else False,
+            original_phone=recipient_phone,
+        )
+
         vals = {
             "account_id": account.id,
             "partner_id": partner.id if partner else False,
             "lead_id": lead.id if lead else False,
+            "conversation_id": conversation.id if conversation else False,
             "assigned_user_id": lead.user_id.id if lead and lead.user_id else False,
             "direction": "outbound",
             "message_type": "text",
@@ -410,6 +429,18 @@ class WhatsAppMessage(models.Model):
         message_type = WebhookEvent._extract_message_type(payload)
         message_body = WebhookEvent._extract_message_body(payload)
 
+        conversation = False
+        if normalized_sender:
+            Conversation = self.env["whatsapp.conversation"].sudo()
+            conversation = Conversation.find_or_create_open_conversation(
+                account=account,
+                normalized_phone=normalized_sender,
+                partner=partner,
+                lead=lead,
+                assigned_user=lead.user_id if lead and lead.user_id else False,
+                original_phone=sender_phone,
+            )
+
         if external_message_id:
             existing_message = self.sudo().search(
                 [
@@ -419,12 +450,30 @@ class WhatsAppMessage(models.Model):
                 limit=1,
             )
             if existing_message:
+                vals = {}
+
+                if conversation and not existing_message.conversation_id:
+                    vals["conversation_id"] = conversation.id
+
+                if lead and not existing_message.lead_id:
+                    vals["lead_id"] = lead.id
+
+                if partner and not existing_message.partner_id:
+                    vals["partner_id"] = partner.id
+
+                if lead and lead.user_id and not existing_message.assigned_user_id:
+                    vals["assigned_user_id"] = lead.user_id.id
+
+                if vals:
+                    existing_message.write(vals)
+
                 return existing_message
 
         return self.sudo().create({
             "account_id": account.id,
             "partner_id": partner.id if partner else False,
             "lead_id": lead.id if lead else False,
+            "conversation_id": conversation.id if conversation else False,
             "assigned_user_id": lead.user_id.id if lead and lead.user_id else False,
             "direction": "inbound",
             "message_type": message_type if message_type in dict(self._fields["message_type"].selection) else "unknown",
