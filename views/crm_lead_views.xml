@@ -37,4 +37,27 @@
         </field>
     </record>
 
+    <!-- CRM Leads navigation from WhatsApp CRM app -->
+    <record id="action_whatsapp_crm_leads" model="ir.actions.act_window">
+        <field name="name">CRM Leads</field>
+        <field name="res_model">crm.lead</field>
+        <field name="view_mode">kanban,list,form,pivot,graph,activity</field>
+        <field name="context">{}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create or review CRM leads related to WhatsApp customer conversations.
+            </p>
+            <p>
+                Use this screen during the demo to move from WhatsApp conversations into the CRM sales pipeline.
+            </p>
+        </field>
+    </record>
+
+    <menuitem
+        id="menu_whatsapp_crm_leads"
+        name="CRM Leads"
+        parent="menu_whatsapp_crm_operations"
+        action="action_whatsapp_crm_leads"
+        sequence="15"/>
+
 </odoo>
