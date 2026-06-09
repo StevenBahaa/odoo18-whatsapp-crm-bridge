@@ -123,12 +123,12 @@ class WhatsAppConversation(models.Model):
     message_ids = fields.One2many(
         comodel_name="whatsapp.message",
         inverse_name="conversation_id",
-        string="Messages",
+        string="Conversation Messages",
         readonly=True,
     )
 
     message_count = fields.Integer(
-        string="Messages",
+        string="Message Count",
         compute="_compute_message_stats",
         store=True,
     )

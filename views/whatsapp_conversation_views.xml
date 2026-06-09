@@ -1,112 +1,166 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
+    <!-- ══════════════════════════════════════════════
+         LIST VIEW — Conversations
+    ══════════════════════════════════════════════ -->
     <record id="view_whatsapp_conversation_list" model="ir.ui.view">
         <field name="name">whatsapp.conversation.list</field>
         <field name="model">whatsapp.conversation</field>
         <field name="arch" type="xml">
-            <list string="WhatsApp Conversations" decoration-danger="needs_reply">
-                <field name="last_message_at"/>
-                <field name="name"/>
-                <field name="account_id"/>
-                <field name="partner_id"/>
-                <field name="lead_id"/>
-                <field name="assigned_user_id"/>
-                <field name="phone"/>
-                <field name="state"/>
-                <field name="closed_at" optional="hide"/>
-                <field name="closed_by_id" optional="hide"/>
-                <field name="needs_reply"/>
-                <field name="message_count"/>
-                <field name="inbound_message_count"/>
-                <field name="outbound_message_count"/>
+            <list string="WhatsApp Conversations"
+                  decoration-danger="needs_reply == True"
+                  decoration-warning="state == 'pending'"
+                  decoration-muted="state == 'closed'">
+                <field name="last_message_at" string="Last Message" optional="show"/>
+                <field name="name" string="Conversation"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'open'"
+                       decoration-warning="state == 'pending'"
+                       decoration-danger="state == 'closed'"/>
+                <field name="needs_reply" widget="boolean_toggle" string="Needs Reply"/>
+                <field name="partner_id" string="Customer"/>
+                <field name="lead_id" string="CRM Lead"/>
+                <field name="assigned_user_id" string="Salesperson"/>
+                <field name="phone" optional="show"/>
+                <field name="account_id" string="Account" optional="show"/>
+                <field name="message_count" string="Messages" optional="show"/>
+                <field name="last_inbound_at" string="Last Inbound" optional="hide"/>
+                <field name="last_outbound_at" string="Last Outbound" optional="hide"/>
+                <field name="inbound_message_count" string="Inbound" optional="hide"/>
+                <field name="outbound_message_count" string="Outbound" optional="hide"/>
+                <field name="closed_at" string="Closed At" optional="hide"/>
+                <field name="closed_by_id" string="Closed By" optional="hide"/>
             </list>
         </field>
     </record>
 
+    <!-- ══════════════════════════════════════════════
+         FORM VIEW — Conversations
+    ══════════════════════════════════════════════ -->
     <record id="view_whatsapp_conversation_form" model="ir.ui.view">
         <field name="name">whatsapp.conversation.form</field>
         <field name="model">whatsapp.conversation</field>
         <field name="arch" type="xml">
             <form string="WhatsApp Conversation">
                 <header>
-                    <button name="action_open_crm_lead" type="object" string="Open CRM Lead" class="btn-primary" invisible="not lead_id"/>
-                    <button name="action_send_whatsapp_message" type="object" string="Send WhatsApp" class="btn-secondary" invisible="not lead_id"/>
-                    <button name="action_mark_open" type="object" string="Mark Open" invisible="state != 'pending'"/>
-                    <button name="action_mark_pending" type="object" string="Mark Pending" invisible="state != 'open'"/>
-                    <button name="action_mark_closed" type="object" string="Close Conversation" class="btn-secondary" invisible="state == 'closed'"/>
-                    <button name="action_mark_open" type="object" string="Reopen Conversation" class="btn-primary" invisible="state != 'closed'"/>
+                    <button name="action_open_crm_lead"
+                            type="object"
+                            string="Open CRM Lead"
+                            class="btn-primary"
+                            invisible="not lead_id"/>
+                    <button name="action_send_whatsapp_message"
+                            type="object"
+                            string="Send WhatsApp"
+                            class="btn-secondary"
+                            invisible="state == 'closed'"/>
+                    <button name="action_mark_open"
+                            type="object"
+                            string="Mark Open"
+                            invisible="state != 'pending'"/>
+                    <button name="action_mark_pending"
+                            type="object"
+                            string="Mark Pending"
+                            invisible="state != 'open'"/>
+                    <button name="action_mark_closed"
+                            type="object"
+                            string="Close Conversation"
+                            class="btn-secondary"
+                            invisible="state == 'closed'"/>
+                    <button name="action_mark_open"
+                            type="object"
+                            string="Reopen Conversation"
+                            class="btn-primary"
+                            invisible="state != 'closed'"/>
                     <field name="state" widget="statusbar" statusbar_visible="open,pending,closed"/>
                 </header>
 
                 <sheet>
                     <div class="oe_title">
+                        <label for="name" class="oe_edit_only"/>
                         <h1>
-                            <field name="name"/>
+                            <field name="name" placeholder="WhatsApp Conversation"/>
                         </h1>
                     </div>
 
+                    <!-- Needs Reply Alert -->
                     <div class="alert alert-warning" role="alert" invisible="not needs_reply">
-                        <strong>Needs Reply</strong> — the customer has sent a newer inbound WhatsApp message than the latest outbound reply.
+                        <strong>⚠ Needs Reply</strong> — The customer has sent a newer inbound
+                        message than the latest outbound reply.
                     </div>
 
                     <group>
-                        <group string="Customer">
-                            <field name="account_id"/>
-                            <field name="company_id"/>
+                        <group string="Customer &amp; CRM">
                             <field name="partner_id"/>
                             <field name="lead_id"/>
                             <field name="assigned_user_id"/>
+                            <field name="account_id"/>
+                            <field name="company_id" readonly="1"/>
                         </group>
 
-                        <group string="Phone">
+                        <group string="Contact Details">
                             <field name="phone"/>
-                            <field name="normalized_phone"/>
-                            <field name="needs_reply"/>
-                        </group>
-                    </group>
-
-                    <group string="Lifecycle">
-                        <group>
-                            <field name="close_reason" placeholder="Optional reason before closing the conversation..." readonly="state == 'closed'"/>
-                            <field name="lifecycle_note" readonly="1"/>
-                        </group>
-                        <group>
-                            <field name="closed_at" readonly="1"/>
-                            <field name="closed_by_id" readonly="1"/>
-                            <field name="last_state_change_at" readonly="1"/>
-                            <field name="last_state_change_by_id" readonly="1"/>
-                        </group>
-                    </group>
-
-                    <group>
-                        <group string="Message Timeline">
-                            <field name="last_message_at"/>
-                            <field name="last_inbound_at"/>
-                            <field name="last_outbound_at"/>
-                        </group>
-
-                        <group string="Counters">
-                            <field name="message_count"/>
-                            <field name="inbound_message_count"/>
-                            <field name="outbound_message_count"/>
+                            <field name="normalized_phone" readonly="1"/>
+                            <field name="needs_reply" readonly="1"/>
                         </group>
                     </group>
 
                     <notebook>
-                        <page string="Messages">
+                        <!-- ── Messages Tab ── -->
+                        <page string="Messages" name="messages">
                             <field name="message_ids" readonly="1">
-                                <list decoration-danger="status == 'failed'" decoration-success="direction == 'inbound'">
-                                    <field name="create_date"/>
-                                    <field name="direction"/>
-                                    <field name="status"/>
-                                    <field name="message_type"/>
-                                    <field name="body"/>
-                                    <field name="recipient_phone"/>
-                                    <field name="external_message_id"/>
-                                    <field name="assigned_user_id"/>
+                                <list decoration-danger="status == 'failed'"
+                                      decoration-success="status == 'read'"
+                                      decoration-info="direction == 'inbound'">
+                                    <field name="create_date" string="Date"/>
+                                    <field name="direction" widget="badge"
+                                           decoration-info="direction == 'inbound'"
+                                           decoration-success="direction == 'outbound'"/>
+                                    <field name="status" widget="badge"
+                                           decoration-success="status == 'read' or status == 'delivered'"
+                                           decoration-danger="status == 'failed'"
+                                           decoration-warning="status == 'sent'"/>
+                                    <field name="message_type" optional="show"/>
+                                    <field name="body" string="Message"/>
+                                    <field name="recipient_phone" string="Phone" optional="show"/>
+                                    <field name="assigned_user_id" string="Salesperson" optional="show"/>
+                                    <field name="external_message_id" optional="hide"/>
                                 </list>
                             </field>
+                        </page>
+
+                        <!-- ── Activity & Counters Tab ── -->
+                        <page string="Activity" name="activity">
+                            <group>
+                                <group string="Message Timeline">
+                                    <field name="last_message_at" readonly="1"/>
+                                    <field name="last_inbound_at" readonly="1"/>
+                                    <field name="last_outbound_at" readonly="1"/>
+                                </group>
+                                <group string="Message Counts">
+                                    <field name="message_count" readonly="1"/>
+                                    <field name="inbound_message_count" readonly="1"/>
+                                    <field name="outbound_message_count" readonly="1"/>
+                                </group>
+                            </group>
+                        </page>
+
+                        <!-- ── Lifecycle Tab ── -->
+                        <page string="Lifecycle" name="lifecycle">
+                            <group>
+                                <group string="Closure Details">
+                                    <field name="close_reason"
+                                           placeholder="Optional reason for closing this conversation..."
+                                           readonly="state == 'closed'"/>
+                                    <field name="closed_at" readonly="1"/>
+                                    <field name="closed_by_id" readonly="1"/>
+                                </group>
+                                <group string="State Audit">
+                                    <field name="last_state_change_at" readonly="1"/>
+                                    <field name="last_state_change_by_id" readonly="1"/>
+                                    <field name="lifecycle_note" readonly="1"/>
+                                </group>
+                            </group>
                         </page>
                     </notebook>
                 </sheet>
@@ -114,41 +168,52 @@
         </field>
     </record>
 
+    <!-- ══════════════════════════════════════════════
+         SEARCH VIEW — Conversations
+    ══════════════════════════════════════════════ -->
     <record id="view_whatsapp_conversation_search" model="ir.ui.view">
         <field name="name">whatsapp.conversation.search</field>
         <field name="model">whatsapp.conversation</field>
         <field name="arch" type="xml">
             <search string="Search WhatsApp Conversations">
                 <field name="name"/>
-                <field name="account_id"/>
-                <field name="partner_id"/>
-                <field name="lead_id"/>
-                <field name="assigned_user_id"/>
+                <field name="partner_id" string="Customer"/>
+                <field name="lead_id" string="CRM Lead"/>
+                <field name="assigned_user_id" string="Salesperson"/>
                 <field name="phone"/>
-                <field name="normalized_phone"/>
-                <field name="state"/>
+                <field name="account_id" string="Account"/>
                 <field name="closed_by_id"/>
 
+                <!-- Status Filters -->
                 <filter name="open" string="Open" domain="[('state', '=', 'open')]"/>
                 <filter name="pending" string="Pending" domain="[('state', '=', 'pending')]"/>
                 <filter name="closed" string="Closed" domain="[('state', '=', 'closed')]"/>
+                <separator/>
                 <filter name="needs_reply" string="Needs Reply" domain="[('needs_reply', '=', True)]"/>
+                <filter name="has_lead" string="Has CRM Lead" domain="[('lead_id', '!=', False)]"/>
+                <filter name="has_customer" string="Has Customer" domain="[('partner_id', '!=', False)]"/>
+                <separator/>
                 <filter name="my_conversations" string="My Conversations" domain="[('assigned_user_id', '=', uid)]"/>
                 <filter name="unassigned" string="Unassigned" domain="[('assigned_user_id', '=', False)]"/>
 
+                <!-- Group By -->
                 <group expand="0" string="Group By">
+                    <filter name="group_by_state" string="Status" context="{'group_by': 'state'}"/>
+                    <filter name="group_by_assigned_user" string="Salesperson" context="{'group_by': 'assigned_user_id'}"/>
+                    <filter name="group_by_partner" string="Customer" context="{'group_by': 'partner_id'}"/>
+                    <filter name="group_by_lead" string="CRM Lead" context="{'group_by': 'lead_id'}"/>
                     <filter name="group_by_account" string="Account" context="{'group_by': 'account_id'}"/>
                     <filter name="group_by_company" string="Company" context="{'group_by': 'company_id'}"/>
-                    <filter name="group_by_assigned_user" string="Assigned Salesperson" context="{'group_by': 'assigned_user_id'}"/>
-                    <filter name="group_by_state" string="Status" context="{'group_by': 'state'}"/>
                     <filter name="group_by_closed_by" string="Closed By" context="{'group_by': 'closed_by_id'}"/>
-                    <filter name="group_by_needs_reply" string="Needs Reply" context="{'group_by': 'needs_reply'}"/>
                     <filter name="group_by_create_date" string="Creation Date" context="{'group_by': 'create_date'}"/>
                 </group>
             </search>
         </field>
     </record>
 
+    <!-- ══════════════════════════════════════════════
+         PIVOT VIEW — Conversations
+    ══════════════════════════════════════════════ -->
     <record id="view_whatsapp_conversation_pivot" model="ir.ui.view">
         <field name="name">whatsapp.conversation.pivot</field>
         <field name="model">whatsapp.conversation</field>
@@ -161,28 +226,70 @@
         </field>
     </record>
 
+    <!-- ══════════════════════════════════════════════
+         GRAPH VIEW — Conversations
+    ══════════════════════════════════════════════ -->
     <record id="view_whatsapp_conversation_graph" model="ir.ui.view">
         <field name="name">whatsapp.conversation.graph</field>
         <field name="model">whatsapp.conversation</field>
         <field name="arch" type="xml">
             <graph string="WhatsApp Conversations" type="bar">
                 <field name="state"/>
+                <field name="assigned_user_id"/>
             </graph>
         </field>
     </record>
 
+    <!-- ══════════════════════════════════════════════
+         ACTIONS
+    ══════════════════════════════════════════════ -->
+
+    <!-- Operational action: list/form first -->
     <record id="action_whatsapp_conversation" model="ir.actions.act_window">
         <field name="name">WhatsApp Conversations</field>
         <field name="res_model">whatsapp.conversation</field>
         <field name="view_mode">list,form,pivot,graph</field>
+        <field name="search_view_id" ref="view_whatsapp_conversation_search"/>
         <field name="context">{'search_default_open': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No WhatsApp conversations yet.
+            </p>
+            <p>
+                Conversations are created automatically when a customer sends an
+                inbound WhatsApp message to your configured account.
+            </p>
+        </field>
     </record>
 
+    <!-- Reporting action: pivot/graph first -->
+    <record id="action_whatsapp_conversation_reporting" model="ir.actions.act_window">
+        <field name="name">Conversation Analysis</field>
+        <field name="res_model">whatsapp.conversation</field>
+        <field name="view_mode">pivot,graph,list</field>
+        <field name="search_view_id" ref="view_whatsapp_conversation_search"/>
+    </record>
+
+    <!-- ══════════════════════════════════════════════
+         MENUS
+    ══════════════════════════════════════════════ -->
+
+    <!-- Operations > Conversations -->
     <menuitem
         id="menu_whatsapp_conversation"
         name="Conversations"
-        parent="menu_whatsapp_crm_configuration"
+        parent="menu_whatsapp_crm_operations"
         action="action_whatsapp_conversation"
-        sequence="15"/>
+        sequence="10"
+        groups="whatsapp_crm_bridge.group_whatsapp_crm_user"/>
+
+    <!-- Reporting > Conversation Analysis -->
+    <menuitem
+        id="menu_whatsapp_conversation_reporting"
+        name="Conversation Analysis"
+        parent="menu_whatsapp_crm_reporting"
+        action="action_whatsapp_conversation_reporting"
+        sequence="30"
+        groups="whatsapp_crm_bridge.group_whatsapp_crm_manager"/>
 
 </odoo>
