@@ -355,7 +355,7 @@ class WhatsAppMessage(models.Model):
         }
 
     @api.model
-    def create_outbound_from_send_result(self, account, lead, partner, recipient_phone, body, send_result):
+    def create_outbound_from_send_result(self, account, lead, partner, recipient_phone, body, send_result, conversation=False):
         """
         Create a durable outbound whatsapp.message from the UC-06 send attempt.
 
@@ -380,16 +380,18 @@ class WhatsAppMessage(models.Model):
         now = fields.Datetime.now()
         success = bool(send_result.get("success"))
 
-        Conversation = self.env["whatsapp.conversation"].sudo()
-
-        conversation = Conversation.find_or_create_open_conversation(
-            account=account,
-            normalized_phone=recipient_phone,
-            partner=partner,
-            lead=lead,
-            assigned_user=lead.user_id if lead and lead.user_id else False,
-            original_phone=recipient_phone,
-        )
+        if conversation and conversation.account_id == account:
+            conversation = conversation.sudo()
+        else:
+            Conversation = self.env["whatsapp.conversation"].sudo()
+            conversation = Conversation.find_or_create_open_conversation(
+                account=account,
+                normalized_phone=recipient_phone,
+                partner=partner,
+                lead=lead,
+                assigned_user=lead.user_id if lead and lead.user_id else False,
+                original_phone=recipient_phone,
+            )
 
         vals = {
             "account_id": account.id,

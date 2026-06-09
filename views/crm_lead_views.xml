@@ -6,6 +6,19 @@
         <field name="model">crm.lead</field>
         <field name="inherit_id" ref="crm.crm_lead_view_form"/>
         <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button
+                    name="action_open_whatsapp_conversations"
+                    type="object"
+                    class="oe_stat_button"
+                    icon="fa-whatsapp"
+                    groups="whatsapp_crm_bridge.group_whatsapp_crm_user"
+                    invisible="whatsapp_conversation_count == 0"
+                >
+                    <field name="whatsapp_conversation_count" widget="statinfo" string="WhatsApp Conversations"/>
+                </button>
+            </xpath>
+
             <xpath expr="//header" position="inside">
                 <button
                     name="%(whatsapp_crm_bridge.action_whatsapp_send_message_wizard)d"

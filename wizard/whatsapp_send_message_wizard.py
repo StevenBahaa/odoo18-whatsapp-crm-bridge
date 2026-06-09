@@ -23,6 +23,12 @@ class WhatsAppSendMessageWizard(models.TransientModel):
         readonly=True,
     )
 
+    conversation_id = fields.Many2one(
+        comodel_name="whatsapp.conversation",
+        string="WhatsApp Conversation",
+        readonly=True,
+    )
+
     account_id = fields.Many2one(
         comodel_name="whatsapp.account",
         string="WhatsApp Account",
@@ -45,6 +51,25 @@ class WhatsAppSendMessageWizard(models.TransientModel):
 
         active_model = self.env.context.get("active_model")
         active_id = self.env.context.get("active_id")
+
+        if active_model == "whatsapp.conversation" and active_id:
+            conversation = self.env["whatsapp.conversation"].browse(active_id).exists()
+            if not conversation:
+                return res
+
+            lead = conversation.lead_id
+            partner = conversation.partner_id or lead.partner_id
+            phone = conversation.normalized_phone or conversation.phone
+
+            res.update({
+                "conversation_id": conversation.id,
+                "lead_id": lead.id if lead else False,
+                "partner_id": partner.id if partner else False,
+                "phone": self.env["whatsapp.webhook.event"]._normalize_phone(phone) if phone else False,
+                "account_id": conversation.account_id.id if conversation.account_id else False,
+            })
+
+            return res
 
         if active_model != "crm.lead" or not active_id:
             return res
@@ -117,6 +142,7 @@ class WhatsAppSendMessageWizard(models.TransientModel):
             recipient_phone=normalized_phone,
             body=self.message_body,
             send_result=send_result,
+            conversation=self.conversation_id,
         )
 
         response_json = send_result.get("response_json") or {}

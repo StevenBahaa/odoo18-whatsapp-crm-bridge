@@ -32,11 +32,9 @@ class WhatsAppWebhookController(http.Controller):
         csrf=False,
     )
     def whatsapp_webhook(self, **kwargs):
-        _logger.warning(
-            "WHATSAPP WEBHOOK HIT method=%s args=%s params=%s",
+        _logger.info(
+            "WhatsApp webhook hit. method=%s",
             request.httprequest.method,
-            kwargs,
-            dict(request.params),
         )
         try:
             db_name = self._get_db_name(**kwargs)
