@@ -6,19 +6,39 @@
         <field name="model">whatsapp.send.message.wizard</field>
         <field name="arch" type="xml">
             <form string="Send WhatsApp Message">
-                <group>
-                    <field name="lead_id"/>
-                    <field name="partner_id"/>
-                    <field name="conversation_id" invisible="not conversation_id"/>
-                    <field name="account_id"/>
-                    <field name="phone"/>
-                    <field name="message_body" placeholder="Write your WhatsApp reply here..."/>
-                </group>
+                <sheet>
+                    <div class="oe_title">
+                        <h2>Send WhatsApp Message</h2>
+                    </div>
+
+                    <group>
+                        <group string="Context">
+                            <field name="lead_id" readonly="1" invisible="not lead_id"/>
+                            <field name="partner_id"/>
+                            <field name="conversation_id" readonly="1" invisible="not conversation_id"/>
+                        </group>
+                        <group string="Delivery">
+                            <field name="account_id"/>
+                            <field name="phone"/>
+                        </group>
+                    </group>
+
+                    <separator string="Message"/>
+                    <field name="message_body"
+                           placeholder="Write your WhatsApp reply here..."
+                           nolabel="1"
+                           widget="text"/>
+
+                    <div class="text-muted mt-2" style="font-size:0.85em;">
+                        <i class="fa fa-info-circle"/> This sends a free-form text message via the
+                        Meta WhatsApp Cloud API. Templates and media are not supported in this MVP.
+                    </div>
+                </sheet>
 
                 <footer>
                     <button
                         name="action_send_message"
-                        string="Send"
+                        string="Send Message"
                         type="object"
                         class="btn-primary"
                     />

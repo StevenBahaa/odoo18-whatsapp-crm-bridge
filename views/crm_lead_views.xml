@@ -6,30 +6,58 @@
         <field name="model">crm.lead</field>
         <field name="inherit_id" ref="crm.crm_lead_view_form"/>
         <field name="arch" type="xml">
+
+            <!-- WhatsApp Conversations smart button -->
             <xpath expr="//div[@name='button_box']" position="inside">
                 <button
                     name="action_open_whatsapp_conversations"
                     type="object"
                     class="oe_stat_button"
-                    icon="fa-whatsapp"
+                    icon="fa-comments"
                     groups="whatsapp_crm_bridge.group_whatsapp_crm_user"
                     invisible="whatsapp_conversation_count == 0"
                 >
-                    <field name="whatsapp_conversation_count" widget="statinfo" string="WhatsApp Conversations"/>
+                    <field name="whatsapp_conversation_count" widget="statinfo" string="WhatsApp"/>
                 </button>
             </xpath>
 
+            <!-- Send WhatsApp button in header -->
             <xpath expr="//header" position="inside">
                 <button
                     name="%(whatsapp_crm_bridge.action_whatsapp_send_message_wizard)d"
                     string="Send WhatsApp"
                     type="action"
-                    class="btn-primary"
+                    class="btn-secondary"
+                    icon="fa-whatsapp"
                     groups="whatsapp_crm_bridge.group_whatsapp_crm_user"
                     context="{'active_model': 'crm.lead', 'active_id': id}"
                 />
             </xpath>
+
         </field>
     </record>
+
+    <!-- CRM Leads navigation from WhatsApp CRM app -->
+    <record id="action_whatsapp_crm_leads" model="ir.actions.act_window">
+        <field name="name">CRM Leads</field>
+        <field name="res_model">crm.lead</field>
+        <field name="view_mode">kanban,list,form,pivot,graph,activity</field>
+        <field name="context">{}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create or review CRM leads related to WhatsApp customer conversations.
+            </p>
+            <p>
+                Use this screen during the demo to move from WhatsApp conversations into the CRM sales pipeline.
+            </p>
+        </field>
+    </record>
+
+    <menuitem
+        id="menu_whatsapp_crm_leads"
+        name="CRM Leads"
+        parent="menu_whatsapp_crm_operations"
+        action="action_whatsapp_crm_leads"
+        sequence="15"/>
 
 </odoo>
