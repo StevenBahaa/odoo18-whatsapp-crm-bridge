@@ -8,6 +8,40 @@ The module turns WhatsApp customer messages into structured CRM leads, trackable
 
 ---
 
+## Table of Contents
+
+- [Project Summary](#project-summary)
+- [Business Problem](#business-problem)
+- [Solution Overview](#solution-overview)
+- [Screenshots](#screenshots)
+- [Key Features](#key-features)
+  - [1. WhatsApp Account Configuration](#1-whatsapp-account-configuration)
+  - [2. Webhook Verification and Inbound Webhook Handling](#2-webhook-verification-and-inbound-webhook-handling)
+  - [3. Partner Matching](#3-partner-matching)
+  - [4. CRM Lead Creation and Reuse](#4-crm-lead-creation-and-reuse)
+  - [5. Durable WhatsApp Messages](#5-durable-whatsapp-messages)
+  - [6. Message Status Updates](#6-message-status-updates)
+  - [7. Conversation Management](#7-conversation-management)
+  - [8. Conversation Follow-up Actions](#8-conversation-follow-up-actions)
+  - [9. CRM Lead Extension](#9-crm-lead-extension)
+  - [10. Reporting](#10-reporting)
+- [Application Menu Structure](#application-menu-structure)
+- [Architecture Overview](#architecture-overview)
+- [Main Odoo Models](#main-odoo-models)
+- [End-to-End Demo Flow](#end-to-end-demo-flow)
+- [Local Setup](#local-setup)
+- [Demo Screenshot Database](#demo-screenshot-database)
+- [Meta Webhook Local Testing](#meta-webhook-local-testing)
+- [Security Notes](#security-notes)
+- [Known Limitations](#known-limitations)
+- [Version Roadmap](#version-roadmap)
+- [Out of Scope for Current MVP](#out-of-scope-for-current-mvp)
+- [Skills Demonstrated](#skills-demonstrated)
+- [Portfolio Positioning](#portfolio-positioning)
+- [Suggested Release Tag](#suggested-release-tag)
+
+---
+
 ## Project Summary
 
 Many businesses receive most of their sales inquiries on WhatsApp, while their official sales pipeline lives inside Odoo CRM.
@@ -16,13 +50,34 @@ Without an integration layer, WhatsApp conversations remain outside the CRM work
 
 `whatsapp_crm_bridge` solves this by introducing a structured WhatsApp CRM layer inside Odoo:
 
-* WhatsApp webhook events are received and logged.
-* Customer phone numbers are normalized and matched to Odoo partners.
-* CRM leads are created or reused automatically.
-* Inbound and outbound WhatsApp messages are stored as durable records.
-* Conversations group messages into an operational follow-up queue.
-* Salespeople can reply manually from CRM leads or conversations.
-* Managers can analyze messages, statuses, conversations, and webhook events through Odoo list, pivot, and graph views.
+- WhatsApp webhook events are received and logged.
+- Customer phone numbers are normalized and matched to Odoo partners.
+- CRM leads are created or reused automatically.
+- Inbound and outbound WhatsApp messages are stored as durable records.
+- Conversations group messages into an operational follow-up queue.
+- Salespeople can reply manually from CRM leads or conversations.
+- Managers can analyze messages, statuses, conversations, and webhook events through Odoo list, pivot, and graph views.
+
+---
+
+## Business Problem
+
+Many sales teams receive new customer inquiries through WhatsApp, while their formal pipeline lives in Odoo CRM. Without an integration layer, customer messages stay outside the CRM process, salesperson ownership is unclear, follow-up history is fragmented, and managers cannot report on WhatsApp activity.
+
+---
+
+## Solution Overview
+
+`whatsapp_crm_bridge` connects WhatsApp webhook events to Odoo CRM concepts:
+
+- Meta webhook verification and inbound webhook receipt are handled through `/whatsapp/webhook`.
+- Raw webhook payloads are stored in an audit model for traceability.
+- Incoming customer phone numbers are normalized for the Egypt-focused MVP.
+- Partners and open CRM leads are matched or created from inbound messages.
+- Inbound and outbound WhatsApp messages are stored in a durable message model.
+- Conversations group messages into an operational follow-up layer with lifecycle states.
+- CRM users can send manual text replies from CRM leads or conversations.
+- Odoo-native list, search, pivot, and graph views support reporting.
 
 ---
 
@@ -120,34 +175,30 @@ Conversation reporting by lifecycle state, helping managers understand open, pen
 
 ### 1. WhatsApp Account Configuration
 
-* Configure WhatsApp Business account metadata.
-* Store Meta API version, phone number ID, WABA ID, and business phone number.
-* Configure webhook verify token and optional webhook secret placeholder.
-* Track account mode: sandbox or production.
-* Track connection state for demo/test visibility.
-* Mask sensitive token fields in the Odoo form.
-
----
+- Configure WhatsApp Business account metadata.
+- Store Meta API version, phone number ID, WABA ID, and business phone number.
+- Configure webhook verify token and optional webhook secret placeholder.
+- Track account mode: sandbox or production.
+- Track connection state for demo/test visibility.
+- Mask sensitive token fields in the Odoo form.
 
 ### 2. Webhook Verification and Inbound Webhook Handling
 
-* Implements Meta webhook verification through:
+- Implements Meta webhook verification through:
 
 ```text
 /whatsapp/webhook
 ```
 
-* Supports external webhook calls without an Odoo browser session.
-* Supports explicit database resolution for local testing:
+- Supports external webhook calls without an Odoo browser session.
+- Supports explicit database resolution for local testing:
 
 ```text
-/whatsapp/webhook?db=whatsapp_crm_bridge
+/whatsapp/webhook?db=<database_name>
 ```
 
-* Stores received webhook data in a raw audit model.
-* Logs webhook hits without printing sensitive query parameters or tokens.
-
----
+- Stores received webhook data in a raw audit model.
+- Logs webhook hits without printing sensitive query parameters or tokens.
 
 ### 3. Partner Matching
 
@@ -163,21 +214,17 @@ Examples:
 
 Inbound WhatsApp messages are matched to existing Odoo partners when possible. If no partner exists, the module creates a new customer record.
 
----
-
 ### 4. CRM Lead Creation and Reuse
 
 Inbound WhatsApp messages are linked to Odoo CRM.
 
 The module can:
 
-* Create a new CRM lead from an inbound WhatsApp inquiry.
-* Reuse an existing open WhatsApp-related CRM lead.
-* Link the lead to the matched customer.
-* Assign the lead salesperson to related WhatsApp messages and conversations.
-* Post safe CRM chatter notes for inbound WhatsApp activity.
-
----
+- Create a new CRM lead from an inbound WhatsApp inquiry.
+- Reuse an existing open WhatsApp-related CRM lead.
+- Link the lead to the matched customer.
+- Assign the lead salesperson to related WhatsApp messages and conversations.
+- Post safe CRM chatter notes for inbound WhatsApp activity.
 
 ### 5. Durable WhatsApp Messages
 
@@ -187,24 +234,22 @@ This is important because Meta status updates arrive later and need a durable me
 
 Tracked message information includes:
 
-* Account
-* Company
-* Customer
-* CRM lead
-* Conversation
-* Assigned salesperson
-* Direction: inbound or outbound
-* Message type
-* Message body
-* External Meta message ID
-* Recipient phone
-* External sender ID
-* Status: draft, received, sent, delivered, read, failed
-* Error code and error message
-* Raw payload
-* Sent, received, delivered, read, and failed timestamps
-
----
+- Account
+- Company
+- Customer
+- CRM lead
+- Conversation
+- Assigned salesperson
+- Direction: inbound or outbound
+- Message type
+- Message body
+- External Meta message ID
+- Recipient phone
+- External sender ID
+- Status: draft, received, sent, delivered, read, failed
+- Error code and error message
+- Raw payload
+- Sent, received, delivered, read, and failed timestamps
 
 ### 6. Message Status Updates
 
@@ -216,14 +261,12 @@ account_id + external_message_id
 
 Supported statuses include:
 
-* Sent
-* Delivered
-* Read
-* Failed
+- Sent
+- Delivered
+- Read
+- Failed
 
 Unmatched status webhooks are safely logged and ignored while still returning a successful HTTP response to Meta.
-
----
 
 ### 7. Conversation Management
 
@@ -231,23 +274,23 @@ The module introduces `whatsapp.conversation` as the operational layer between m
 
 A conversation tracks:
 
-* Customer
-* Phone and normalized phone
-* WhatsApp account
-* CRM lead
-* Assigned salesperson
-* State: open, pending, closed
-* Message count
-* Inbound and outbound counts
-* Last inbound message date
-* Last outbound message date
-* Last message date
-* Needs-reply indicator
-* Close reason
-* Closed by
-* Closed at
-* Last lifecycle note
-* Last state change details
+- Customer
+- Phone and normalized phone
+- WhatsApp account
+- CRM lead
+- Assigned salesperson
+- State: open, pending, closed
+- Message count
+- Inbound and outbound counts
+- Last inbound message date
+- Last outbound message date
+- Last message date
+- Needs-reply indicator
+- Close reason
+- Closed by
+- Closed at
+- Last lifecycle note
+- Last state change details
 
 Conversation matching uses:
 
@@ -257,24 +300,20 @@ account_id + normalized_phone + state in open/pending
 
 If a conversation is closed and the same customer sends a new inbound message, a new conversation can be created.
 
----
-
 ### 8. Conversation Follow-up Actions
 
 Salespeople can work directly from the conversation screen.
 
 Available actions include:
 
-* Open related CRM lead.
-* Send WhatsApp message using the existing send wizard.
-* Mark conversation as pending.
-* Mark conversation as open.
-* Close conversation.
-* Reopen conversation.
+- Open related CRM lead.
+- Send WhatsApp message using the existing send wizard.
+- Mark conversation as pending.
+- Mark conversation as open.
+- Close conversation.
+- Reopen conversation.
 
 Outbound messages sent from a conversation are linked back to the same conversation when possible.
-
----
 
 ### 9. CRM Lead Extension
 
@@ -282,14 +321,12 @@ The module extends CRM leads with WhatsApp operations.
 
 CRM lead additions include:
 
-* Send WhatsApp button.
-* WhatsApp Conversations smart button.
-* Related conversation access from the CRM lead.
-* WhatsApp CRM navigation shortcut to CRM leads.
+- Send WhatsApp button.
+- WhatsApp Conversations smart button.
+- Related conversation access from the CRM lead.
+- WhatsApp CRM navigation shortcut to CRM leads.
 
 The standard CRM flow is preserved.
-
----
 
 ### 10. Reporting
 
@@ -297,22 +334,22 @@ The module uses Odoo-native list, search, pivot, and graph views.
 
 Reporting is available for:
 
-* WhatsApp messages
-* WhatsApp conversations
-* Webhook events
+- WhatsApp messages
+- WhatsApp conversations
+- Webhook events
 
 Useful reporting dimensions include:
 
-* Message direction
-* Message status
-* Salesperson
-* Customer
-* CRM lead
-* Conversation state
-* Webhook event type
-* Webhook processing status
-* Account
-* Creation date
+- Message direction
+- Message status
+- Salesperson
+- Customer
+- CRM lead
+- Conversation state
+- Webhook event type
+- Webhook processing status
+- Account
+- Creation date
 
 ---
 
@@ -341,25 +378,25 @@ WhatsApp CRM
 
 The module separates the integration into four clear layers.
 
-| Layer                          | Model                    | Purpose                                                                                |
-| ------------------------------ | ------------------------ | -------------------------------------------------------------------------------------- |
-| Raw audit/debug layer          | `whatsapp.webhook.event` | Stores webhook payloads, processing status, extracted metadata, and matching results.  |
-| Durable message layer          | `whatsapp.message`       | Stores inbound/outbound messages and delivery/read/failure status updates.             |
-| Operational conversation layer | `whatsapp.conversation`  | Groups messages into sales follow-up conversations with ownership and lifecycle state. |
-| Sales pipeline layer           | `crm.lead`               | Represents the sales lead or opportunity created/reused from WhatsApp inquiries.       |
+| Layer | Model | Purpose |
+| --- | --- | --- |
+| Raw audit/debug layer | `whatsapp.webhook.event` | Stores webhook payloads, processing status, extracted metadata, and matching results. |
+| Durable message layer | `whatsapp.message` | Stores inbound/outbound messages and delivery/read/failure status updates. |
+| Operational conversation layer | `whatsapp.conversation` | Groups messages into sales follow-up conversations with ownership and lifecycle state. |
+| Sales pipeline layer | `crm.lead` | Represents the sales lead or opportunity created/reused from WhatsApp inquiries. |
 
 ---
 
 ## Main Odoo Models
 
-| Model                          | Purpose                                                         |
-| ------------------------------ | --------------------------------------------------------------- |
-| `whatsapp.account`             | WhatsApp Business account configuration and Meta API metadata.  |
-| `whatsapp.webhook.event`       | Raw webhook audit log and processing trace.                     |
-| `whatsapp.message`             | Durable inbound/outbound WhatsApp message record.               |
-| `whatsapp.conversation`        | Operational customer conversation and follow-up layer.          |
+| Model | Purpose |
+| --- | --- |
+| `whatsapp.account` | WhatsApp Business account configuration and Meta API metadata. |
+| `whatsapp.webhook.event` | Raw webhook audit log and processing trace. |
+| `whatsapp.message` | Durable inbound/outbound WhatsApp message record. |
+| `whatsapp.conversation` | Operational customer conversation and follow-up layer. |
 | `whatsapp.send.message.wizard` | Manual text reply wizard used from CRM leads and conversations. |
-| `crm.lead`                     | Extended Odoo CRM lead with WhatsApp actions and smart button.  |
+| `crm.lead` | Extended Odoo CRM lead with WhatsApp actions and smart button. |
 
 ---
 
@@ -387,15 +424,23 @@ A typical demo scenario:
 
 ## Local Setup
 
-### 1. Clone into Odoo Addons Path
+### 1. Clone into Your Odoo Addons Path
 
-Clone the repository into your Odoo custom addons path.
+Clone the repository into any custom addons path used by your Odoo instance.
 
 Example:
 
 ```bash
-C:\odoo18\dev\whatsapp_crm_bridge
+git clone <repository-url> /path/to/your/odoo/custom-addons/whatsapp_crm_bridge
 ```
+
+On Windows, this may look like:
+
+```text
+C:\path\to\odoo\custom-addons\whatsapp_crm_bridge
+```
+
+Make sure your `odoo.conf` includes the parent addons directory in `addons_path`.
 
 ### 2. Ensure Dependencies
 
@@ -407,22 +452,64 @@ Odoo 18 Community
 
 Required Odoo apps include:
 
-* CRM
-* Mail
+- CRM
+- Mail
 
-### 3. Upgrade the Module
+### 3. Create or Select a Database
 
-```bash
-python odoo-bin -c odoo.conf -d whatsapp_crm_bridge -u whatsapp_crm_bridge --stop-after-init --max-cron-threads=0 --db-filter=^whatsapp_crm_bridge$
+Create a database using Odoo Database Manager or use an existing development database.
+
+Example database names:
+
+```text
+my_odoo_dev
+whatsapp_crm_demo
+odoo18_test
 ```
 
-### 4. Run Odoo Locally
+The database name is not fixed. Replace `<database_name>` in the commands below with your own database name.
+
+### 4. Install or Upgrade the Module
+
+From your Odoo server directory, run:
 
 ```bash
-python odoo-bin -c odoo.conf -d whatsapp_crm_bridge --max-cron-threads=0 --db-filter=^whatsapp_crm_bridge$ --http-port=8070
+python odoo-bin -c <path_to_odoo.conf> -d <database_name> -u whatsapp_crm_bridge --stop-after-init --max-cron-threads=0
+```
+
+If your local setup uses a strict database filter, add:
+
+```bash
+--db-filter=^<database_name>$
+```
+
+Example:
+
+```bash
+python odoo-bin -c odoo.conf -d my_odoo_dev -u whatsapp_crm_bridge --stop-after-init --max-cron-threads=0 --db-filter=^my_odoo_dev$
+```
+
+### 5. Run Odoo Locally
+
+Run the Odoo server using your preferred port:
+
+```bash
+python odoo-bin -c <path_to_odoo.conf> -d <database_name> --max-cron-threads=0 --http-port=<port>
+```
+
+Example:
+
+```bash
+python odoo-bin -c odoo.conf -d my_odoo_dev --max-cron-threads=0 --http-port=8070
 ```
 
 Then open:
+
+```text
+http://localhost:<port>
+```
+
+Example:
 
 ```text
 http://localhost:8070
@@ -432,22 +519,34 @@ http://localhost:8070
 
 ## Demo Screenshot Database
 
-For portfolio screenshots, use a separate demo database:
+For portfolio screenshots, it is recommended to use a separate clean demo database instead of the main development database.
+
+Example demo database names:
 
 ```text
+whatsapp_crm_demo
 whatsapp_crm_bridge_demo
+odoo18_whatsapp_demo
 ```
+
+Replace `<demo_database_name>` with your own demo database name.
 
 Upgrade the module on the demo database:
 
 ```bash
-python odoo-bin -c odoo.conf -d whatsapp_crm_bridge_demo -u whatsapp_crm_bridge --stop-after-init --max-cron-threads=0 --db-filter=^whatsapp_crm_bridge_demo$
+python odoo-bin -c <path_to_odoo.conf> -d <demo_database_name> -u whatsapp_crm_bridge --stop-after-init --max-cron-threads=0
+```
+
+If needed, add a database filter:
+
+```bash
+--db-filter=^<demo_database_name>$
 ```
 
 Run the demo server:
 
 ```bash
-python odoo-bin -c odoo.conf -d whatsapp_crm_bridge_demo --max-cron-threads=0 --db-filter=^whatsapp_crm_bridge_demo$ --http-port=8070
+python odoo-bin -c <path_to_odoo.conf> -d <demo_database_name> --max-cron-threads=0 --http-port=<port>
 ```
 
 The repository includes manually executed demo data scripts under:
@@ -457,6 +556,8 @@ scripts/
 ```
 
 These scripts are intended for local screenshot/demo databases only and are not loaded automatically during module installation.
+
+Before running any demo data script, verify the target database name inside the script and make sure your Odoo shell is connected to the intended demo database.
 
 ---
 
@@ -471,7 +572,7 @@ The webhook route is:
 For local testing with a tunnel such as ngrok, configure Meta with a callback URL like:
 
 ```text
-https://<your-tunnel-host>/whatsapp/webhook?db=whatsapp_crm_bridge
+https://<your-tunnel-host>/whatsapp/webhook?db=<database_name>
 ```
 
 Webhook verification expects Meta query parameters:
@@ -492,14 +593,14 @@ This module is a portfolio-grade MVP and is not a hardened production deployment
 
 Security design notes:
 
-* Access tokens and webhook secrets must use placeholders in demos and documentation.
-* Token fields are masked in the Odoo form.
-* Token fields should be restricted to integration/admin users.
-* Form masking does not encrypt values in the database.
-* Production deployments should use encrypted secret storage, environment variables, or a deployment secret manager.
-* Webhook logs must not print access tokens, verify tokens, webhook secrets, or raw authorization headers.
-* Raw webhook payloads may contain customer data and should be treated as restricted operational audit data.
-* Webhook signature validation is not implemented in the current MVP.
+- Access tokens and webhook secrets must use placeholders in demos and documentation.
+- Token fields are masked in the Odoo form.
+- Token fields should be restricted to integration/admin users.
+- Form masking does not encrypt values in the database.
+- Production deployments should use encrypted secret storage, environment variables, or a deployment secret manager.
+- Webhook logs must not print access tokens, verify tokens, webhook secrets, or raw authorization headers.
+- Raw webhook payloads may contain customer data and should be treated as restricted operational audit data.
+- Webhook signature validation is not implemented in the current MVP.
 
 ---
 
@@ -507,22 +608,22 @@ Security design notes:
 
 The following limitations are intentional for this portfolio MVP:
 
-* Odoo 18 Community only.
-* Egypt-focused phone normalization only.
-* Manual free-form text replies only.
-* No WhatsApp template management.
-* No media message support.
-* No campaign or bulk messaging features.
-* No live chat interface.
-* No real-time bus notifications.
-* No chatbot.
-* No AI suggested replies.
-* No SLA automation.
-* No cron retry queue.
-* No advanced assignment engine.
-* No production secret manager integration.
-* No webhook signature validation.
-* Connection test is a local placeholder and not a full Meta API validation flow.
+- Odoo 18 Community only.
+- Egypt-focused phone normalization only.
+- Manual free-form text replies only.
+- No WhatsApp template management.
+- No media message support.
+- No campaign or bulk messaging features.
+- No live chat interface.
+- No real-time bus notifications.
+- No chatbot.
+- No AI suggested replies.
+- No SLA automation.
+- No cron retry queue.
+- No advanced assignment engine.
+- No production secret manager integration.
+- No webhook signature validation.
+- Connection test is a local placeholder and not a full Meta API validation flow.
 
 ---
 
@@ -532,49 +633,49 @@ The following limitations are intentional for this portfolio MVP:
 
 Implemented:
 
-* WhatsApp account configuration
-* Webhook verification
-* Inbound webhook logging
-* Partner matching
-* CRM lead creation/reuse
-* Manual reply wizard foundation
+- WhatsApp account configuration
+- Webhook verification
+- Inbound webhook logging
+- Partner matching
+- CRM lead creation/reuse
+- Manual reply wizard foundation
 
 ### v0.2.0 — Message Status and Assignment
 
 Implemented:
 
-* Durable WhatsApp message model
-* Outbound message tracking
-* Status update handling
-* Salesperson assignment
-* My/assigned/unassigned filters
+- Durable WhatsApp message model
+- Outbound message tracking
+- Status update handling
+- Salesperson assignment
+- My/assigned/unassigned filters
 
 ### v0.3.0 — Conversations and Reporting
 
 Implemented:
 
-* Odoo-native reporting views
-* Message analysis
-* Webhook event analysis
-* WhatsApp conversation model
-* Conversation counters
-* Needs-reply tracking
-* Conversation ownership
+- Odoo-native reporting views
+- Message analysis
+- Webhook event analysis
+- WhatsApp conversation model
+- Conversation counters
+- Needs-reply tracking
+- Conversation ownership
 
 ### v0.4.0 — Conversation Operations and Portfolio Release
 
 Implemented:
 
-* Conversation follow-up actions
-* Send WhatsApp from conversation
-* CRM Lead smart button for conversations
-* Conversation lifecycle management
-* View UX polish
-* Business-friendly menu structure
-* CRM Leads menu inside WhatsApp CRM operations
-* Demo data scripts
-* Portfolio screenshots
-* README and documentation polish
+- Conversation follow-up actions
+- Send WhatsApp from conversation
+- CRM Lead smart button for conversations
+- Conversation lifecycle management
+- View UX polish
+- Business-friendly menu structure
+- CRM Leads menu inside WhatsApp CRM operations
+- Demo data scripts
+- Portfolio screenshots
+- README and documentation polish
 
 ---
 
@@ -582,18 +683,18 @@ Implemented:
 
 The following features are intentionally excluded to keep the MVP focused:
 
-* WhatsApp templates
-* Media messages
-* Bulk campaigns
-* Live chat UI
-* Odoo bus real-time updates
-* Chatbot flows
-* AI reply suggestions
-* SLA automation
-* Advanced assignment rules
-* Multi-country phone normalization
-* Payment integration
-* Website form integration
+- WhatsApp templates
+- Media messages
+- Bulk campaigns
+- Live chat UI
+- Odoo bus real-time updates
+- Chatbot flows
+- AI reply suggestions
+- SLA automation
+- Advanced assignment rules
+- Multi-country phone normalization
+- Payment integration
+- Website form integration
 
 ---
 
@@ -601,20 +702,20 @@ The following features are intentionally excluded to keep the MVP focused:
 
 This project demonstrates:
 
-* Odoo 18 Community module development
-* Odoo model design
-* CRM customization
-* Transient wizard development
-* External webhook handling
-* Meta WhatsApp Cloud API integration concept
-* Partner matching and phone normalization
-* Durable message tracking
-* Operational conversation workflow design
-* Odoo XML views, search views, pivot views, and graph views
-* Odoo action/menu design
-* Safe logging and token handling
-* Portfolio demo preparation
-* Git feature-branch workflow and release tagging
+- Odoo 18 Community module development
+- Odoo model design
+- CRM customization
+- Transient wizard development
+- External webhook handling
+- Meta WhatsApp Cloud API integration concept
+- Partner matching and phone normalization
+- Durable message tracking
+- Operational conversation workflow design
+- Odoo XML views, search views, pivot views, and graph views
+- Odoo action/menu design
+- Safe logging and token handling
+- Portfolio demo preparation
+- Git feature-branch workflow and release tagging
 
 ---
 
@@ -626,12 +727,12 @@ It shows how a business-critical messaging channel like WhatsApp can be connecte
 
 The goal is not to replace WhatsApp Business tools, but to demonstrate how inbound WhatsApp activity can become:
 
-* CRM leads
-* Customer records
-* Trackable messages
-* Salesperson-owned conversations
-* Follow-up workflows
-* Managerial reporting data
+- CRM leads
+- Customer records
+- Trackable messages
+- Salesperson-owned conversations
+- Follow-up workflows
+- Managerial reporting data
 
 ---
 
